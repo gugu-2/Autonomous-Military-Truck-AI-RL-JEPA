@@ -1,0 +1,23 @@
+[submodule "autoware"]
+	path = autoware
+	url = https://github.com/autowarefoundation/autoware.git
+
+[submodule "drive_jepa"]
+	path = drive_jepa
+	url = https://github.com/linhanwang/Drive-JEPA.git
+
+[submodule "cardreamer"]
+	path = cardreamer
+	url = https://github.com/ucd-dare/CarDreamer.git
+
+[submodule "ijepa"]
+	path = ijepa
+	url = https://github.com/facebookresearch/ijepa.git
+
+[submodule "vjepa"]
+	path = vjepa
+	url = https://github.com/facebookresearch/jepa.git
+
+[submodule "alpamayo_recipes"]
+	path = alpamayo_recipes
+	url = https://github.com/NVlabs/alpamayo-recipes.git

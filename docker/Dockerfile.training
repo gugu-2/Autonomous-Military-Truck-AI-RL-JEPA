@@ -1,0 +1,33 @@
+# Dockerfile.training
+FROM omnidrive-base:latest
+
+LABEL description="Training Docker image for OMNIDRIVE"
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+USER omnidrive
+
+# Install deepspeed, flash-attn, triton, bitsandbytes, wandb
+RUN pip install --no-cache-dir \
+    deepspeed \
+    flash-attn --no-build-isolation \
+    triton \
+    bitsandbytes \
+    wandb
+
+# Install datasets toolkits
+RUN pip install --no-cache-dir nuscenes-devkit waymo-open-dataset-tf-2-12-0
+
+# Set up data directories
+RUN mkdir -p /workspace/omnidrive/data/nuscenes \
+             /workspace/omnidrive/data/waymo \
+             /workspace/omnidrive/logs \
+             /workspace/omnidrive/checkpoints
+
+# Volumes are better defined in docker-compose, but we document them here
+VOLUME ["/workspace/omnidrive/data", "/workspace/omnidrive/logs", "/workspace/omnidrive/checkpoints"]
+
+ENTRYPOINT ["/bin/bash"]

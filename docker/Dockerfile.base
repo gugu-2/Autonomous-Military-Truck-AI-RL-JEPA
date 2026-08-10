@@ -1,0 +1,80 @@
+# Dockerfile.base
+FROM nvcr.io/nvidia/pytorch:24.05-py3
+
+LABEL maintainer="OMNIDRIVE AI Team"
+LABEL version="1.0"
+LABEL description="Base Docker image for OMNIDRIVE autonomous driving AI system with ROS 2 Humble, PyTorch, and CUDA"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies, CAN utils, and basic tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libglib2.0-0 \
+    python3-dev \
+    libeigen3-dev \
+    libpcl-dev \
+    can-utils \
+    iproute2 \
+    libsocketcan-dev \
+    software-properties-common \
+    locales \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set locale for ROS 2
+RUN locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Install ROS 2 Humble (Desktop)
+RUN add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y ros-humble-desktop python3-colcon-common-extensions && \
+    rm -rf /var/lib/apt/lists/*
+
+# Source ROS 2 in .bashrc
+RUN echo "source /opt/ros/humble/setup.bash" >> /etc/bash.bashrc
+
+# Create non-root user
+ARG USERNAME=omnidrive
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Create workspace
+WORKDIR /workspace/omnidrive
+RUN chown -R $USERNAME:$USERNAME /workspace/omnidrive
+
+# Switch to non-root user
+USER $USERNAME
+
+# Environment Variables
+ENV PYTHONPATH=/workspace/omnidrive/src:$PYTHONPATH
+ENV ROS_DOMAIN_ID=42
+
+# Copy pyproject.toml and install Python deps
+COPY --chown=$USERNAME:$USERNAME pyproject.toml ./
+# If there's an error due to missing setup.py or README, just install it without building
+RUN pip install --no-cache-dir . || pip install -r <(sed -n -e 's/^[[:space:]]*//' -e 's/^"//' -e 's/"$//' -e '/^[^\[]/p' pyproject.toml) || true
+
+# Copy src/ directory
+COPY --chown=$USERNAME:$USERNAME src/ /workspace/omnidrive/src/
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import torch; assert torch.cuda.is_available()" || exit 1

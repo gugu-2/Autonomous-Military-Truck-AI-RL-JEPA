@@ -1,0 +1,44 @@
+defaults:
+  - base_config
+
+# Override vehicle mode for robotaxi applications
+project:
+  vehicle_mode: robotaxi
+
+# Sensor suite optimized for urban driving
+sensors:
+  cameras:
+    num_cameras: 8
+
+# Geofencing constraints for robotaxi operations
+geofencing:
+  enabled: true
+  max_area_km2: 50.0
+  allowed_zones: data/maps/geofence_zones.geojson
+
+# Passenger interaction interfaces
+passenger:
+  hmi_port: 8080
+  emergency_button_topic: /vehicle/emergency_stop
+
+# Vehicle interface (Drive-by-Wire)
+vehicle_interface:
+  type: can
+  dbw:
+    kit: dataspeed
+    steering_ratio: 14.8
+    brake_deadband: 0.1
+
+# Urban navigation speed limits
+navigation:
+  planning:
+    max_speed_kmh: 60.0
+
+# Fleet management configuration
+fleet_management:
+  endpoint: wss://fleet.omnidrive.ai/connect
+  telemetry_rate_hz: 1.0
+
+# Safety level for passenger vehicles
+safety:
+  asil_level: B

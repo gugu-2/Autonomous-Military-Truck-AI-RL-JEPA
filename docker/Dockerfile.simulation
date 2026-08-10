@@ -1,0 +1,17 @@
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+
+# Simulation environment for CARLA and Autoware
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3.10 python3-pip \
+    libpng16-16 libjpeg8 libtiff5 \
+    vulkan-utils libvulkan1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir \
+    carla==0.9.15 \
+    pygame numpy opencv-python
+
+WORKDIR /workspace/simulation
+CMD ["bash"]

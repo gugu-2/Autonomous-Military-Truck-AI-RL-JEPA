@@ -1,0 +1,47 @@
+# Hardware Profile: NVIDIA DRIVE AGX Orin
+hardware:
+  platform: nvidia_drive_orin
+  
+  # CPU Specifications
+  cpu:
+    cores: 12
+    architecture: Arm Cortex-A78AE
+    frequency_ghz: 2.2
+    
+  # GPU Specifications
+  gpu:
+    architecture: Ampere
+    cuda_cores: 2048
+    tensor_cores: 64
+    memory:
+      type: LPDDR5
+      shared_gb: 64
+      bandwidth_gbps: 205
+      
+  # Deep Learning Accelerators
+  dla:
+    count: 2
+    version: 3.0
+    
+  # Performance Metrics
+  performance:
+    int8_tops: 254
+    fp16_tflops: 5.3
+    
+  # Power and Thermal
+  power:
+    nominal_w: 60
+    max_w: 70
+    thermal_limit_c: 85
+    
+  # Software Stack
+  software:
+    cuda_capability: 8.7
+    tensorrt_version: 8.6
+    drive_os_version: 6.0
+    
+  # Compute Configuration
+  compute:
+    mixed_precision: true
+    tf32_enabled: true
+    dla_fallback_to_gpu: true

@@ -1,0 +1,76 @@
+defaults:
+  - base_config
+
+# Override vehicle mode for military applications
+project:
+  vehicle_mode: military
+
+# Enhanced military sensor suite
+sensors:
+  cameras:
+    num_cameras: 12
+  lidar:
+    enabled: true
+    dual_setup: true  # Primary and secondary LiDAR
+    bev_resolution: 0.05
+    bev_range_m: 200.0
+    bev_height_bins: 64
+  thermal:
+    enabled: true
+    resolution: [640, 480]
+    fps: 30
+    palette: white_hot
+
+# More conservative safety thresholds for military ops
+jepa:
+  hazard:
+    veto_threshold: 0.60
+
+# Enhanced reward function for mission success and stealth
+rl:
+  reward:
+    w_mission: 1.5
+    w_stealth: 1.2
+  action_space:
+    mission_halt: true
+
+# Advanced reasoning model for tactical environments
+reasoning:
+  model: alpamayo-2-70b-super
+
+# Navigation with offline maps and higher speed limits
+navigation:
+  autoware:
+    map_path: data/maps/military_offline.osm
+  planning:
+    max_speed_kmh: 120.0
+
+# Military vehicle interface standards
+vehicle_interface:
+  type: jaus
+  jaus:
+    subsystem_id: 100
+    node_id: 1
+    component_id: 1
+  mil_std_1553:
+    enabled: true
+    terminal_mode: remote
+    subaddress: 30
+
+# Convoy mode configuration
+convoy_mode:
+  enabled: true
+  role: follower  # 'leader' or 'follower'
+  following_distance_m: 20.0
+  communication_protocol: secure_v2v
+
+# Stricter safety and security requirements
+safety:
+  asil_level: D
+  black_box:
+    encrypted: true
+
+security:
+  encryption:
+    algorithm: aes-256-gcm
+    key_management: hardware_token

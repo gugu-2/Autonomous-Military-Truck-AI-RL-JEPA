@@ -1,0 +1,23 @@
+# Dockerfile.inference
+FROM omnidrive-base:latest
+
+LABEL description="Lean Inference Docker image for OMNIDRIVE"
+
+USER root
+
+# Install TensorRT dependencies
+# Note: typically nvcr.io/nvidia/pytorch has TensorRT, but adding specific inference tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tensorrt \
+    libnvinfer8 \
+    libnvinfer-plugin8 \
+    && rm -rf /var/lib/apt/lists/*
+
+USER omnidrive
+
+# Install any python specific inference packages, like ONNX, TensorRT
+RUN pip install --no-cache-dir onnx onnxruntime-gpu tensorrt
+
+# Set execution entry point
+# In a real scenario, this would point to the main inference script
+ENTRYPOINT ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && python src/omnidrive/inference/main.py"]

@@ -1,0 +1,50 @@
+defaults:
+  - base_config
+
+# Override vehicle mode for trucking applications
+project:
+  vehicle_mode: truck
+
+# Sensor suite optimized for trucks
+sensors:
+  cameras:
+    num_cameras: 8
+  lidar:
+    enabled: true
+    single_setup: true
+    bev_range_m: 150.0
+
+# Navigation constraints for heavy vehicles
+navigation:
+  planning:
+    max_speed_kmh: 90.0
+  truck_constraints:
+    max_height_m: 4.2
+    max_weight_kg: 36000
+    bridge_restrictions: true
+
+# Commercial vehicle interface standards
+vehicle_interface:
+  type: j1939
+  j1939:
+    bus_channel: can1
+    preferred_pgns: [61444, 61443, 65262]
+  trailer:
+    connected: true
+    abs_monitoring: true
+  profiles:
+    freightliner:
+      engine_type: detroit_diesel
+    volvo:
+      engine_type: d13
+    kenworth:
+      engine_type: paccar_mx13
+
+# Highest safety level for heavy commercial vehicles
+safety:
+  asil_level: D
+
+# Reward function optimized for fuel economy
+rl:
+  reward:
+    w_efficiency: 1.5
