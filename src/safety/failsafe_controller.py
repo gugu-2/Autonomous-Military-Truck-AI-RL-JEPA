@@ -1,7 +1,8 @@
 """Failsafe controller — graceful controlled stop on system failure."""
-import time
-import threading
+
 import logging
+import threading
+import time
 from enum import Enum, auto
 
 
@@ -37,7 +38,7 @@ class FailsafeController:
             self.state = FailsafeState.DECELERATING
             self.activate_hazard_lights()
             self.broadcast_sos(reason)
-            
+
             if flag == SafetyFlag.FAILSAFE:
                 self.trigger_emergency_stop(reason)
             else:
@@ -54,7 +55,9 @@ class FailsafeController:
 
     def controlled_deceleration_stop(self, target_decel: float = -2.5):
         self.logger.info(f"Initiating controlled deceleration at {target_decel} m/s^2")
-        self._decel_thread = threading.Thread(target=self._decel_loop, args=(target_decel,), daemon=True)
+        self._decel_thread = threading.Thread(
+            target=self._decel_loop, args=(target_decel,), daemon=True
+        )
         self._decel_thread.start()
 
     def _decel_loop(self, target_decel: float):
@@ -67,7 +70,7 @@ class FailsafeController:
                         self.state = FailsafeState.STOPPED
                     self.vehicle_interface.apply_parking_brake()
                     break
-                
+
                 # Apply brake corresponding to target deceleration
                 self.vehicle_interface.apply_brake_for_deceleration(target_decel)
                 time.sleep(0.05)

@@ -9,10 +9,10 @@ notebook = {
             "source": [
                 "# OMNIDRIVE - Stage 2: DreamerV3 RL Controller Training on Colab T4\n",
                 "\n",
-                "This notebook trains the **DreamerV3 Reinforcement Learning Controller** entirely in the \"imagination\" of the JEPA World Model we fine-tuned in Stage 1.\n",
+                'This notebook trains the **DreamerV3 Reinforcement Learning Controller** entirely in the "imagination" of the JEPA World Model we fine-tuned in Stage 1.\n',
                 "\n",
-                "Because it trains in latent space, it is incredibly sample-efficient and **does not require a live simulator** during the imagination phase if you have a pre-saved replay buffer. If starting from scratch, it can interface with a headless CARLA instance."
-            ]
+                "Because it trains in latent space, it is incredibly sample-efficient and **does not require a live simulator** during the imagination phase if you have a pre-saved replay buffer. If starting from scratch, it can interface with a headless CARLA instance.",
+            ],
         },
         {
             "cell_type": "code",
@@ -25,7 +25,7 @@ notebook = {
                 "from google.colab import drive\n",
                 "import os\n",
                 "\n",
-                "print(\"Mounting Google Drive...\")\n",
+                'print("Mounting Google Drive...")\n',
                 "drive.mount('/content/drive')\n",
                 "\n",
                 "# Create directories for RL checkpoints and replay buffers\n",
@@ -34,10 +34,10 @@ notebook = {
                 "os.makedirs(RL_CHECKPOINT_DIR, exist_ok=True)\n",
                 "os.makedirs(REPLAY_BUFFER_DIR, exist_ok=True)\n",
                 "\n",
-                "print(\"\\nInstalling dependencies...\")\n",
+                'print("\\nInstalling dependencies...")\n',
                 "!pip install -q torch torchvision omegaconf gymnasium numpy\n",
-                "print(\"✅ Dependencies installed!\")"
-            ]
+                'print("✅ Dependencies installed!")',
+            ],
         },
         {
             "cell_type": "code",
@@ -53,17 +53,17 @@ notebook = {
                 "OMNIDRIVE_SRC = '/content/OMNIDRIVE_PROJECT'\n",
                 "\n",
                 "if not os.path.exists(OMNIDRIVE_SRC):\n",
-                "    print(\"Copying OMNIDRIVE_PROJECT from your Google Drive...\")\n",
+                '    print("Copying OMNIDRIVE_PROJECT from your Google Drive...")\n',
                 "    drive_project_path = '/content/drive/MyDrive/OMNIDRIVE_PROJECT'\n",
                 "    if os.path.exists(drive_project_path):\n",
                 "        shutil.copytree(drive_project_path, OMNIDRIVE_SRC, dirs_exist_ok=True)\n",
-                "        print(\"✅ Copied source code.\")\n",
+                '        print("✅ Copied source code.")\n',
                 "\n",
                 "src_path = os.path.join(OMNIDRIVE_SRC, 'src')\n",
                 "if src_path not in sys.path:\n",
                 "    sys.path.append(src_path)\n",
-                "print(\"✅ Python path configured.\")"
-            ]
+                'print("✅ Python path configured.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -73,7 +73,7 @@ notebook = {
             "source": [
                 "# 3. LOAD FINE-TUNED JEPA WORLD MODEL\n",
                 "# ===================================\n",
-                "# We need the world model from Stage 1 to serve as the \"imagination\" environment.\n",
+                '# We need the world model from Stage 1 to serve as the "imagination" environment.\n',
                 "\n",
                 "import torch\n",
                 "import glob\n",
@@ -88,7 +88,7 @@ notebook = {
                 "        config = load_config('configs/base_config.yaml')\n",
                 "        model = JEPAWorldModel(config.jepa).to(device)\n",
                 "    except Exception as e:\n",
-                "        print(f\"⚠️ Using Mock JEPA for notebook: {e}\")\n",
+                '        print(f"⚠️ Using Mock JEPA for notebook: {e}")\n',
                 "        import torch.nn as nn\n",
                 "        class MockJEPA(nn.Module):\n",
                 "            def __init__(self):\n",
@@ -101,10 +101,10 @@ notebook = {
                 "    jepa_checkpoints = sorted(glob.glob('/content/drive/MyDrive/OMNIDRIVE_PROJECT/checkpoints/jepa/*.pth'))\n",
                 "    if jepa_checkpoints:\n",
                 "        latest = jepa_checkpoints[-1]\n",
-                "        print(f\"📥 Loading fine-tuned JEPA from: {latest}\")\n",
+                '        print(f"📥 Loading fine-tuned JEPA from: {latest}")\n',
                 "        # In actual code: model.load_state_dict(torch.load(latest, map_location=device)['model_state_dict'])\n",
                 "    else:\n",
-                "        print(\"⚠️ No Stage 1 checkpoint found! Using untrained/base weights.\")\n",
+                '        print("⚠️ No Stage 1 checkpoint found! Using untrained/base weights.")\n',
                 "\n",
                 "    # Freeze the JEPA model entirely (RL controller does not update the vision brain)\n",
                 "    for param in model.parameters():\n",
@@ -113,8 +113,8 @@ notebook = {
                 "    model.eval()\n",
                 "    return model\n",
                 "\n",
-                "jepa_world_model = load_jepa_world_model('')"
-            ]
+                "jepa_world_model = load_jepa_world_model('')",
+            ],
         },
         {
             "cell_type": "code",
@@ -142,8 +142,8 @@ notebook = {
                 "    'num_classes': 32,           # Categorical classes\n",
                 "    'action_dim': 3,             # Steering, Throttle, Brake\n",
                 "}\n",
-                "print(\"✅ Colab T4 RL Configuration loaded.\")"
-            ]
+                'print("✅ Colab T4 RL Configuration loaded.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -167,7 +167,7 @@ notebook = {
                 "        class Critic(nn.Module):\n",
                 "            def __init__(self, **kw): super().__init__(); self.p = nn.Parameter(torch.zeros(1))\n",
                 "\n",
-                "    print(\"Initializing RSSM (Recurrent State Space Model)...\")\n",
+                '    print("Initializing RSSM (Recurrent State Space Model)...")\n',
                 "    rssm = RSSM(\n",
                 "        deter_dim=config['deter_dim'],\n",
                 "        stoch_dim=config['stoch_dim'],\n",
@@ -176,7 +176,7 @@ notebook = {
                 "        action_dim=config['action_dim']\n",
                 "    ).to(device)\n",
                 "\n",
-                "    print(\"Initializing Actor-Critic networks...\")\n",
+                '    print("Initializing Actor-Critic networks...")\n',
                 "    feat_dim = config['deter_dim'] + (config['stoch_dim'] * config['num_classes'])\n",
                 "    actor = Actor(feat_dim=feat_dim, action_dim=config['action_dim']).to(device)\n",
                 "    critic = Critic(feat_dim=feat_dim).to(device)\n",
@@ -187,8 +187,8 @@ notebook = {
                 "\n",
                 "opt_rssm = torch.optim.AdamW(rssm.parameters(), lr=RL_CONFIG_T4['rssm_lr'])\n",
                 "opt_actor = torch.optim.AdamW(actor.parameters(), lr=RL_CONFIG_T4['actor_lr'])\n",
-                "opt_critic = torch.optim.AdamW(critic.parameters(), lr=RL_CONFIG_T4['critic_lr'])"
-            ]
+                "opt_critic = torch.optim.AdamW(critic.parameters(), lr=RL_CONFIG_T4['critic_lr'])",
+            ],
         },
         {
             "cell_type": "code",
@@ -201,8 +201,8 @@ notebook = {
                 "import time\n",
                 "\n",
                 "def train_in_imagination(steps=1000):\n",
-                "    print(\"\\n🚀 Starting DreamerV3 Training in Latent Imagination...\")\n",
-                "    print(\"Using Mixed Precision (bfloat16) to maximize T4 efficiency.\")\n",
+                '    print("\\n🚀 Starting DreamerV3 Training in Latent Imagination...")\n',
+                '    print("Using Mixed Precision (bfloat16) to maximize T4 efficiency.")\n',
                 "    \n",
                 "    scaler = torch.cuda.amp.GradScaler()\n",
                 "    \n",
@@ -244,42 +244,40 @@ notebook = {
                 "        \n",
                 "        if step % 100 == 0:\n",
                 "            fps = step * batch_size * seq_len / (time.time() - start_time)\n",
-                "            print(f\"Step {step}/{steps} | RSSM Loss: 0.50 | Actor Loss: 0.30 | FPS: {fps:.0f}\")\n",
+                '            print(f"Step {step}/{steps} | RSSM Loss: 0.50 | Actor Loss: 0.30 | FPS: {fps:.0f}")\n',
                 "            \n",
                 "        # Save checkpoint periodically\n",
                 "        if step % 500 == 0:\n",
-                "            ckpt_path = f\"{RL_CHECKPOINT_DIR}/dreamer_step_{step}.pth\"\n",
+                '            ckpt_path = f"{RL_CHECKPOINT_DIR}/dreamer_step_{step}.pth"\n',
                 "            torch.save({\n",
                 "                'rssm': rssm.state_dict(),\n",
                 "                'actor': actor.state_dict(),\n",
                 "                'critic': critic.state_dict()\n",
                 "            }, ckpt_path)\n",
-                "            print(f\"💾 Saved RL checkpoint to {ckpt_path}\")\n",
+                '            print(f"💾 Saved RL checkpoint to {ckpt_path}")\n',
                 "\n",
-                "    print(\"🎉 Imagination Training Complete!\")\n",
+                '    print("🎉 Imagination Training Complete!")\n',
                 "\n",
-                "train_in_imagination(steps=1000)"
-            ]
-        }
+                "train_in_imagination(steps=1000)",
+            ],
+        },
     ],
     "metadata": {
-        "colab": {
-            "provenance": []
-        },
-        "kernelspec": {
-            "display_name": "Python 3",
-            "name": "python3"
-        },
-        "language_info": {
-            "name": "python"
-        }
+        "colab": {"provenance": []},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"},
     },
     "nbformat": 4,
-    "nbformat_minor": 0
+    "nbformat_minor": 0,
 }
 
-import os
-os.makedirs("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks", exist_ok=True)
-with open("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/02_DreamerV3_RL_Colab.ipynb", "w") as f:
+os.makedirs(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks",
+    exist_ok=True,
+)
+with open(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/02_DreamerV3_RL_Colab.ipynb",
+    "w",
+) as f:
     json.dump(notebook, f, indent=2)
 print("RL Notebook created successfully.")

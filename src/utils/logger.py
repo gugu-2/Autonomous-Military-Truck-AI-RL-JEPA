@@ -2,16 +2,13 @@ import sys
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Optional, Any
 
-from loguru import logger
 import torch
+from loguru import logger
+
 
 def setup_logger(
-    name: str,
-    level: str = "INFO",
-    log_dir: Optional[str] = None,
-    vehicle_mode: Optional[str] = None
+    name: str, level: str = "INFO", log_dir: str | None = None, vehicle_mode: str | None = None
 ) -> "loguru.Logger":
     """
     Sets up a structured logger using loguru.
@@ -23,7 +20,7 @@ def setup_logger(
         level=level,
         colorize=True,
     )
-    
+
     if log_dir:
         path = Path(log_dir)
         path.mkdir(parents=True, exist_ok=True)
@@ -35,7 +32,7 @@ def setup_logger(
             rotation="50 MB",
             retention="10 days",
             compression="zip",
-            serialize=True, # JSON structured logging
+            serialize=True,  # JSON structured logging
         )
     return logger
 
@@ -44,6 +41,7 @@ def log_latency(name: str):
     """
     Performance timer context manager/decorator that logs ms latency.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -53,7 +51,9 @@ def log_latency(name: str):
             latency = (end - start) * 1000
             logger.debug(f"{name} took {latency:.2f} ms")
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -64,13 +64,13 @@ def log_tensor_stats(name: str, tensor: torch.Tensor) -> None:
     if tensor is None:
         logger.debug(f"Tensor '{name}' is None")
         return
-    
+
     try:
         shape = tuple(tensor.shape)
         t_min = tensor.min().item()
         t_max = tensor.max().item()
         t_mean = tensor.to(torch.float32).mean().item()
-        
+
         logger.debug(
             f"Tensor '{name}': shape={shape}, min={t_min:.4f}, max={t_max:.4f}, mean={t_mean:.4f}"
         )
@@ -82,8 +82,8 @@ def log_tensor_stats(name: str, tensor: torch.Tensor) -> None:
 omni_logger = logger
 
 __all__ = [
-    'setup_logger',
-    'log_latency',
-    'log_tensor_stats',
-    'omni_logger',
+    "setup_logger",
+    "log_latency",
+    "log_tensor_stats",
+    "omni_logger",
 ]

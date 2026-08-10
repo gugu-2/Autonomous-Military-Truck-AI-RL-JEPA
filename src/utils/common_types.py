@@ -1,9 +1,9 @@
 """
 Common Data Types for OMNIDRIVE Project
 """
+
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import List, Optional
 
 import numpy as np
 import torch
@@ -18,9 +18,9 @@ class SafetyFlag(IntEnum):
 
 
 class VehicleMode(str, Enum):
-    ROBOTAXI = 'robotaxi'
-    TRUCK = 'truck'
-    MILITARY = 'military'
+    ROBOTAXI = "robotaxi"
+    TRUCK = "truck"
+    MILITARY = "military"
 
 
 class HazardLevel(IntEnum):
@@ -33,26 +33,31 @@ class HazardLevel(IntEnum):
 # Error codes
 class OmniDriveError(Exception):
     """Base exception for OMNIDRIVE errors."""
+
     pass
 
 
 class SensorFailureError(OmniDriveError):
     """Raised when a sensor fails."""
+
     pass
 
 
 class JEPAInferenceError(OmniDriveError):
     """Raised during JEPA inference failure."""
+
     pass
 
 
 class SafetyVetoError(OmniDriveError):
     """Raised when a safety check vetoes an action."""
+
     pass
 
 
 class VehicleInterfaceError(OmniDriveError):
     """Raised on vehicle communication errors."""
+
     pass
 
 
@@ -61,10 +66,10 @@ class EgoPose:
     x: float  # metres, East
     y: float  # metres, North
     z: float  # metres, Up
-    roll: float   # radians
+    roll: float  # radians
     pitch: float  # radians
-    yaw: float    # radians
-    vx: float     # m/s body frame
+    yaw: float  # radians
+    vx: float  # m/s body frame
     vy: float
     vz: float
     timestamp: float  # Unix epoch seconds
@@ -84,7 +89,7 @@ class SensorHealthStatus:
 @dataclass
 class TrackedObject3D:
     object_id: int
-    class_label: str   # 'vehicle', 'pedestrian', 'cyclist', 'obstacle', 'soldier'
+    class_label: str  # 'vehicle', 'pedestrian', 'cyclist', 'obstacle', 'soldier'
     x: float  # metres, world frame
     y: float
     z: float
@@ -102,7 +107,7 @@ class TrackedObject3D:
 class BEVFeatureMap:
     data: np.ndarray  # shape (H, W, C) = (1000, 1000, 8)
     resolution: float  # metres per pixel, default 0.1
-    origin_x: float   # world coords of bottom-left corner
+    origin_x: float  # world coords of bottom-left corner
     origin_y: float
     timestamp: float
 
@@ -110,7 +115,7 @@ class BEVFeatureMap:
 @dataclass
 class UnifiedWorldState:
     ego_pose: EgoPose
-    tracked_objects: List[TrackedObject3D]
+    tracked_objects: list[TrackedObject3D]
     bev_feature_map: BEVFeatureMap
     sensor_health: SensorHealthStatus
     timestamp: float
@@ -120,7 +125,7 @@ class UnifiedWorldState:
 @dataclass
 class LatentState:
     context_tokens: torch.Tensor  # shape (N, D) = (256, 512)
-    bev_tokens: torch.Tensor      # shape (H//8, W//8, D)
+    bev_tokens: torch.Tensor  # shape (H//8, W//8, D)
     hazard_energy_map: torch.Tensor  # shape (16, 16) spatial hazard grid
     timestamp: float
 
@@ -128,29 +133,30 @@ class LatentState:
 @dataclass
 class DrivingAction:
     steering_angle: float  # degrees, [-45, +45]
-    throttle: float        # [0.0, 1.0]
-    brake: float           # [0.0, 1.0]
-    gear: int              # -1=reverse, 0=neutral, 1-8=forward
+    throttle: float  # [0.0, 1.0]
+    brake: float  # [0.0, 1.0]
+    gear: int  # -1=reverse, 0=neutral, 1-8=forward
     # Military extensions
     mission_halt: bool = False
     # Truck extensions
     trailer_brake: float = 0.0
     retarder: float = 0.0
 
+
 __all__ = [
-    'SafetyFlag',
-    'VehicleMode',
-    'HazardLevel',
-    'OmniDriveError',
-    'SensorFailureError',
-    'JEPAInferenceError',
-    'SafetyVetoError',
-    'VehicleInterfaceError',
-    'EgoPose',
-    'SensorHealthStatus',
-    'TrackedObject3D',
-    'BEVFeatureMap',
-    'UnifiedWorldState',
-    'LatentState',
-    'DrivingAction',
+    "SafetyFlag",
+    "VehicleMode",
+    "HazardLevel",
+    "OmniDriveError",
+    "SensorFailureError",
+    "JEPAInferenceError",
+    "SafetyVetoError",
+    "VehicleInterfaceError",
+    "EgoPose",
+    "SensorHealthStatus",
+    "TrackedObject3D",
+    "BEVFeatureMap",
+    "UnifiedWorldState",
+    "LatentState",
+    "DrivingAction",
 ]

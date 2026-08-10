@@ -1,14 +1,18 @@
 """Action space definitions and constraints for OMNIDRIVE driving policy."""
-import torch
-import numpy as np
-from dataclasses import dataclass, asdict
+
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Tuple, Dict, Any
+from typing import Any
+
+import numpy as np
+import torch
+
 
 class VehicleMode(Enum):
     ROBOTAXI = auto()
     TRUCK = auto()
     MILITARY = auto()
+
 
 @dataclass
 class DrivingAction:
@@ -18,6 +22,7 @@ class DrivingAction:
     trailer_brake: float = 0.0
     retarder: float = 0.0
     mission_halt: bool = False
+
 
 @dataclass
 class ActionBounds:
@@ -34,28 +39,31 @@ class ActionBounds:
     max_steering_rate: float = 0.8
     max_jerk: float = 3.0
 
+
 class ActionSpace:
-    def __init__(self, config: Dict[str, Any], vehicle_mode: VehicleMode):
+    def __init__(self, config: dict[str, Any], vehicle_mode: VehicleMode):
         self.config = config
         self.vehicle_mode = vehicle_mode
-        self.bounds = ActionBounds(**config.get('bounds', {}))
-        
+        self.bounds = ActionBounds(**config.get("bounds", {}))
+
         # Base dimensions (steering, throttle, brake)
         self.dim = 3
         if self.vehicle_mode == VehicleMode.TRUCK:
-            self.dim += 2 # trailer_brake, retarder
+            self.dim += 2  # trailer_brake, retarder
         elif self.vehicle_mode == VehicleMode.MILITARY:
-            self.dim += 1 # mission_halt (continuous relaxed to discrete)
+            self.dim += 1  # mission_halt (continuous relaxed to discrete)
 
     def sample(self) -> DrivingAction:
         """Sample a random valid action within bounds."""
         action = DrivingAction(
             steering=np.random.uniform(self.bounds.steering_min, self.bounds.steering_max),
             throttle=np.random.uniform(self.bounds.throttle_min, self.bounds.throttle_max),
-            brake=np.random.uniform(self.bounds.brake_min, self.bounds.brake_max)
+            brake=np.random.uniform(self.bounds.brake_min, self.bounds.brake_max),
         )
         if self.vehicle_mode == VehicleMode.TRUCK:
-            action.trailer_brake = np.random.uniform(self.bounds.trailer_brake_min, self.bounds.trailer_brake_max)
+            action.trailer_brake = np.random.uniform(
+                self.bounds.trailer_brake_min, self.bounds.trailer_brake_max
+            )
             action.retarder = np.random.uniform(self.bounds.retarder_min, self.bounds.retarder_max)
         elif self.vehicle_mode == VehicleMode.MILITARY:
             action.mission_halt = np.random.choice([True, False])
@@ -67,13 +75,17 @@ class ActionSpace:
             steering=np.clip(action.steering, self.bounds.steering_min, self.bounds.steering_max),
             throttle=np.clip(action.throttle, self.bounds.throttle_min, self.bounds.throttle_max),
             brake=np.clip(action.brake, self.bounds.brake_min, self.bounds.brake_max),
-            trailer_brake=np.clip(action.trailer_brake, self.bounds.trailer_brake_min, self.bounds.trailer_brake_max),
+            trailer_brake=np.clip(
+                action.trailer_brake, self.bounds.trailer_brake_min, self.bounds.trailer_brake_max
+            ),
             retarder=np.clip(action.retarder, self.bounds.retarder_min, self.bounds.retarder_max),
-            mission_halt=action.mission_halt
+            mission_halt=action.mission_halt,
         )
         return clipped
 
-    def apply_rate_limits(self, action: DrivingAction, prev_action: DrivingAction, dt: float) -> DrivingAction:
+    def apply_rate_limits(
+        self, action: DrivingAction, prev_action: DrivingAction, dt: float
+    ) -> DrivingAction:
         """Enforces max steering rate and max jerk."""
         if prev_action is None:
             return self.clip(action)
@@ -81,17 +93,27 @@ class ActionSpace:
         max_steer_delta = self.bounds.max_steering_rate * dt
         max_accel_delta = self.bounds.max_jerk * dt
 
-        steer = np.clip(action.steering, prev_action.steering - max_steer_delta, prev_action.steering + max_steer_delta)
-        throttle = np.clip(action.throttle, prev_action.throttle - max_accel_delta, prev_action.throttle + max_accel_delta)
-        brake = np.clip(action.brake, prev_action.brake - max_accel_delta, prev_action.brake + max_accel_delta)
-        
+        steer = np.clip(
+            action.steering,
+            prev_action.steering - max_steer_delta,
+            prev_action.steering + max_steer_delta,
+        )
+        throttle = np.clip(
+            action.throttle,
+            prev_action.throttle - max_accel_delta,
+            prev_action.throttle + max_accel_delta,
+        )
+        brake = np.clip(
+            action.brake, prev_action.brake - max_accel_delta, prev_action.brake + max_accel_delta
+        )
+
         rate_limited_action = DrivingAction(
             steering=float(steer),
             throttle=float(throttle),
             brake=float(brake),
             trailer_brake=action.trailer_brake,
             retarder=action.retarder,
-            mission_halt=action.mission_halt
+            mission_halt=action.mission_halt,
         )
         return self.clip(rate_limited_action)
 
@@ -107,26 +129,22 @@ class ActionSpace:
     def from_tensor(self, tensor: torch.Tensor) -> DrivingAction:
         """Converts RL tensor back to DrivingAction."""
         t = tensor.detach().cpu().numpy()
-        action = DrivingAction(
-            steering=float(t[0]),
-            throttle=float(t[1]),
-            brake=float(t[2])
-        )
+        action = DrivingAction(steering=float(t[0]), throttle=float(t[1]), brake=float(t[2]))
         if self.vehicle_mode == VehicleMode.TRUCK and len(t) >= 5:
             action.trailer_brake = float(t[3])
             action.retarder = float(t[4])
         elif self.vehicle_mode == VehicleMode.MILITARY and len(t) >= 4:
             action.mission_halt = bool(t[3] > 0.0)
-        
+
         return self.clip(action)
 
     def is_valid(self, action: DrivingAction) -> bool:
         """Checks if an action is strictly within bounds."""
         a = self.clip(action)
         return (
-            np.isclose(a.steering, action.steering) and
-            np.isclose(a.throttle, action.throttle) and
-            np.isclose(a.brake, action.brake) and
-            np.isclose(a.trailer_brake, action.trailer_brake) and
-            np.isclose(a.retarder, action.retarder)
+            np.isclose(a.steering, action.steering)
+            and np.isclose(a.throttle, action.throttle)
+            and np.isclose(a.brake, action.brake)
+            and np.isclose(a.trailer_brake, action.trailer_brake)
+            and np.isclose(a.retarder, action.retarder)
         )

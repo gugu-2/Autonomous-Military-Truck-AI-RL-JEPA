@@ -1,7 +1,8 @@
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 class HDMapLoader:
     """
@@ -9,11 +10,12 @@ class HDMapLoader:
     In OMNIDRIVE, the AI handles local routing, but Autoware's Lanelet2 map
     provides the global graph for city-scale navigation.
     """
+
     def __init__(self, map_path: str):
         self.map_path = map_path
         self.map_data = None
         self.is_loaded = False
-        
+
     def load(self) -> bool:
         """
         Loads the Lanelet2 OSM file.
@@ -30,8 +32,8 @@ class HDMapLoader:
             logger.error(f"Failed to load HD Map: {e}")
             self.is_loaded = False
             return False
-            
-    def get_closest_lanelet(self, x: float, y: float) -> Optional[Any]:
+
+    def get_closest_lanelet(self, x: float, y: float) -> Any | None:
         """
         Finds the closest Lanelet to a given (x,y) coordinate.
         Used for snapping the ego vehicle to the map.

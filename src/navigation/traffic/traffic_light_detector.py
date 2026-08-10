@@ -1,16 +1,20 @@
 import logging
-from typing import Dict, Any, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 class TrafficLightDetector:
     """
     Subscribes to Autoware's traffic light recognition or handles V2X (Vehicle-to-Everything)
     traffic light statuses for intersection handling.
     """
-    def __init__(self, config: Dict[str, Any]):
-        self.current_signals: Dict[int, str] = {} # Map of light_id to status ('RED', 'GREEN', 'YELLOW')
-        
+
+    def __init__(self, config: dict[str, Any]):
+        self.current_signals: dict[int, str] = (
+            {}
+        )  # Map of light_id to status ('RED', 'GREEN', 'YELLOW')
+
     def update_signals_from_ros(self, ros_msg: Any):
         """
         Callback for the ROS 2 traffic signal topic.
@@ -24,18 +28,18 @@ class TrafficLightDetector:
                 if signal.lights:
                     color = signal.lights[0].color
                     if color == 1:
-                        status = 'RED'
+                        status = "RED"
                     elif color == 2:
-                        status = 'YELLOW'
+                        status = "YELLOW"
                     elif color == 3:
-                        status = 'GREEN'
+                        status = "GREEN"
                     else:
-                        status = 'UNKNOWN'
-                        
+                        status = "UNKNOWN"
+
                     self.current_signals[signal_id] = status
-        except Exception as e:
+        except Exception:
             pass
-            
+
     def get_signal_state(self, lanelet_id: int) -> str:
         """
         Check the traffic light state for a specific intersection lanelet.

@@ -1,16 +1,18 @@
-import re
-from typing import Dict, Any, Optional
 import logging
+import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 class IntentParser:
     """
     Parses natural language output from the VLA model into structured JSON intent.
     """
+
     VALID_ACTIONS = ["STOP", "SLOW_DOWN", "TURN_LEFT", "TURN_RIGHT", "REROUTE", "YIELD", "PROCEED"]
-    
-    def parse(self, raw_text: str) -> Optional[Dict[str, Any]]:
+
+    def parse(self, raw_text: str) -> dict[str, Any] | None:
         """
         Extracts action and reason from the raw model output.
         Expected format: "ACTION. Reason text..."
@@ -18,13 +20,13 @@ class IntentParser:
         """
         if not raw_text:
             return None
-            
+
         # Try to find the action word at the beginning of the text
         text_upper = raw_text.upper()
-        
-        detected_action = "PROCEED" # Default safe fallback
+
+        detected_action = "PROCEED"  # Default safe fallback
         reason = raw_text
-        
+
         for action in self.VALID_ACTIONS:
             # Look for exact action word as the first word
             if text_upper.startswith(action):
@@ -34,7 +36,7 @@ class IntentParser:
                 if reason_match:
                     reason = reason_match.group(1).strip()
                 break
-                
+
         # If no explicit action at the start, try to extract intent from keywords
         if detected_action == "PROCEED":
             if "stop" in text_upper:
@@ -43,8 +45,5 @@ class IntentParser:
                 detected_action = "SLOW_DOWN"
             elif "reroute" in text_upper or "alternative" in text_upper:
                 detected_action = "REROUTE"
-                
-        return {
-            "action": detected_action,
-            "reason": reason
-        }
+
+        return {"action": detected_action, "reason": reason}

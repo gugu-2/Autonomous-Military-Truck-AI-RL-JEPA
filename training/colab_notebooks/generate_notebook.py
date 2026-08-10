@@ -9,8 +9,8 @@ notebook = {
                 "# OMNIDRIVE - Stage 1: JEPA Fine-Tuning on Google Colab T4\n",
                 "\n",
                 "This notebook is optimized for the **Google Colab Free T4 (16GB VRAM)**.\n",
-                "It fine-tunes the `Drive-JEPA` pretrained model on your own driving video clips, allowing it to adapt to your specific domain (military, trucks, robotaxis) **without needing labels**."
-            ]
+                "It fine-tunes the `Drive-JEPA` pretrained model on your own driving video clips, allowing it to adapt to your specific domain (military, trucks, robotaxis) **without needing labels**.",
+            ],
         },
         {
             "cell_type": "code",
@@ -26,7 +26,7 @@ notebook = {
                 "from google.colab import drive\n",
                 "import os\n",
                 "\n",
-                "print(\"Mounting Google Drive...\")\n",
+                'print("Mounting Google Drive...")\n',
                 "drive.mount('/content/drive')\n",
                 "\n",
                 "# Create directories for checkpoints and data\n",
@@ -35,14 +35,14 @@ notebook = {
                 "os.makedirs(CHECKPOINT_DIR, exist_ok=True)\n",
                 "os.makedirs(DATA_DIR, exist_ok=True)\n",
                 "\n",
-                "print(f\"\\n✅ Checkpoint directory ready: {CHECKPOINT_DIR}\")\n",
-                "print(f\"✅ Data directory ready: {DATA_DIR}\")\n",
+                'print(f"\\n✅ Checkpoint directory ready: {CHECKPOINT_DIR}")\n',
+                'print(f"✅ Data directory ready: {DATA_DIR}")\n',
                 "\n",
                 "# Install required libraries\n",
-                "print(\"\\nInstalling dependencies...\")\n",
+                'print("\\nInstalling dependencies...")\n',
                 "!pip install -q torch torchvision einops timm transformers huggingface_hub omegaconf opencv-python\n",
-                "print(\"✅ Dependencies installed!\")"
-            ]
+                'print("✅ Dependencies installed!")',
+            ],
         },
         {
             "cell_type": "code",
@@ -57,16 +57,16 @@ notebook = {
                 "WEIGHTS_DIR = '/content/drive/MyDrive/OMNIDRIVE_PROJECT/weights/drive_jepa'\n",
                 "os.makedirs(WEIGHTS_DIR, exist_ok=True)\n",
                 "\n",
-                "print(\"Downloading Drive-JEPA pretrained weights (~680 MB)...\")\n",
-                "print(\"This might take a few minutes the first time, but will be cached on your Google Drive.\")\n",
+                'print("Downloading Drive-JEPA pretrained weights (~680 MB)...")\n',
+                'print("This might take a few minutes the first time, but will be cached on your Google Drive.")\n',
                 "\n",
                 "snapshot_download(\n",
-                "    repo_id=\"linhanwang/Drive-JEPA\",\n",
+                '    repo_id="linhanwang/Drive-JEPA",\n',
                 "    local_dir=WEIGHTS_DIR,\n",
                 "    local_dir_use_symlinks=False\n",
                 ")\n",
-                "print(f\"\\n✅ Drive-JEPA downloaded to: {WEIGHTS_DIR}\")"
-            ]
+                'print(f"\\n✅ Drive-JEPA downloaded to: {WEIGHTS_DIR}")',
+            ],
         },
         {
             "cell_type": "code",
@@ -84,7 +84,7 @@ notebook = {
                 "OMNIDRIVE_SRC = '/content/OMNIDRIVE_PROJECT'\n",
                 "\n",
                 "if not os.path.exists(OMNIDRIVE_SRC):\n",
-                "    print(\"Copying OMNIDRIVE_PROJECT from your Google Drive...\")\n",
+                '    print("Copying OMNIDRIVE_PROJECT from your Google Drive...")\n',
                 "    # Replace this with git clone if your repo is on GitHub:\n",
                 "    # !git clone https://github.com/YOUR_REPO/OMNIDRIVE_PROJECT.git /content/OMNIDRIVE_PROJECT\n",
                 "    \n",
@@ -92,16 +92,16 @@ notebook = {
                 "    drive_project_path = '/content/drive/MyDrive/OMNIDRIVE_PROJECT'\n",
                 "    if os.path.exists(drive_project_path):\n",
                 "        shutil.copytree(drive_project_path, OMNIDRIVE_SRC, dirs_exist_ok=True)\n",
-                "        print(\"✅ Copied source code from Google Drive.\")\n",
+                '        print("✅ Copied source code from Google Drive.")\n',
                 "    else:\n",
-                "        print(f\"⚠️ {drive_project_path} not found. Please upload the OMNIDRIVE_PROJECT folder to your Drive.\")\n",
+                '        print(f"⚠️ {drive_project_path} not found. Please upload the OMNIDRIVE_PROJECT folder to your Drive.")\n',
                 "\n",
                 "# Add the src directory to Python path\n",
                 "src_path = os.path.join(OMNIDRIVE_SRC, 'src')\n",
                 "if src_path not in sys.path:\n",
                 "    sys.path.append(src_path)\n",
-                "print(f\"✅ Added {src_path} to Python path.\")"
-            ]
+                'print(f"✅ Added {src_path} to Python path.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -119,13 +119,13 @@ notebook = {
                 "import glob\n",
                 "\n",
                 "class DrivingVideoDataset(Dataset):\n",
-                "    \"\"\"\n",
+                '    """\n',
                 "    Loads driving video clips for JEPA fine-tuning.\n",
                 "    NO LABELS NEEDED! The model learns by predicting the future.\n",
-                "    \"\"\"\n",
+                '    """\n',
                 "    def __init__(self, video_dir, clip_len=5, img_size=224):\n",
-                "        self.clips = glob.glob(f\"{video_dir}/**/*.mp4\", recursive=True)\n",
-                "        self.clips += glob.glob(f\"{video_dir}/**/*.avi\", recursive=True)\n",
+                '        self.clips = glob.glob(f"{video_dir}/**/*.mp4", recursive=True)\n',
+                '        self.clips += glob.glob(f"{video_dir}/**/*.avi", recursive=True)\n',
                 "        self.clip_len = clip_len\n",
                 "        self.img_size = img_size\n",
                 "        \n",
@@ -135,7 +135,7 @@ notebook = {
                 "            transforms.ToTensor(),\n",
                 "            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])\n",
                 "        ])\n",
-                "        print(f\"✅ Found {len(self.clips)} video clips in {video_dir}\")\n",
+                '        print(f"✅ Found {len(self.clips)} video clips in {video_dir}")\n',
                 "\n",
                 "    def __len__(self):\n",
                 "        return len(self.clips)\n",
@@ -167,8 +167,8 @@ notebook = {
                 "            \n",
                 "        return torch.stack(frames) # Shape: (T, C, H, W)\n",
                 "\n",
-                "print(\"✅ Dataset class defined.\")"
-            ]
+                'print("✅ Dataset class defined.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -192,15 +192,15 @@ notebook = {
                 "        model = JEPAWorldModel(config.jepa)\n",
                 "        \n",
                 "        # Load pretrained weights into encoder\n",
-                "        checkpoint_path = f\"{weights_dir}/drive_jepa_checkpoint.pth\"\n",
+                '        checkpoint_path = f"{weights_dir}/drive_jepa_checkpoint.pth"\n',
                 "        if os.path.exists(checkpoint_path):\n",
                 "            checkpoint = torch.load(checkpoint_path, map_location=device)\n",
                 "            # Filter and load encoder weights\n",
                 "            encoder_state = {k.replace('encoder.', ''): v for k, v in checkpoint['model_state_dict'].items() if k.startswith('encoder.')}\n",
                 "            model.encoder.load_state_dict(encoder_state, strict=False)\n",
-                "            print(f\"✅ Loaded {len(encoder_state)} pretrained encoder weights.\")\n",
+                '            print(f"✅ Loaded {len(encoder_state)} pretrained encoder weights.")\n',
                 "    except Exception as e:\n",
-                "        print(f\"⚠️ Could not load from source (mocking for colab test): {e}\")\n",
+                '        print(f"⚠️ Could not load from source (mocking for colab test): {e}")\n',
                 "        import torch.nn as nn\n",
                 "        # Mock model for notebook demonstration\n",
                 "        class MockJEPA(nn.Module):\n",
@@ -222,15 +222,15 @@ notebook = {
                 "        \n",
                 "    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)\n",
                 "    \n",
-                "    print(f\"✅ Frozen {frozen_params:,} encoder parameters.\")\n",
-                "    print(f\"✅ Training {trainable_params:,} predictor parameters.\")\n",
+                '    print(f"✅ Frozen {frozen_params:,} encoder parameters.")\n',
+                '    print(f"✅ Training {trainable_params:,} predictor parameters.")\n',
                 "    \n",
                 "    return model\n",
                 "\n",
                 "device = 'cuda' if torch.cuda.is_available() else 'cpu'\n",
-                "print(f\"Using device: {device}\")\n",
-                "model = setup_jepa_model(WEIGHTS_DIR, device)"
-            ]
+                'print(f"Using device: {device}")\n',
+                "model = setup_jepa_model(WEIGHTS_DIR, device)",
+            ],
         },
         {
             "cell_type": "code",
@@ -246,7 +246,7 @@ notebook = {
                 "    # Note: batch_size=4 is chosen to fit inside 16GB T4 VRAM\n",
                 "    dataset = DrivingVideoDataset(data_dir)\n",
                 "    if len(dataset) == 0:\n",
-                "        print(f\"⚠️ No videos found in {data_dir}. Add some .mp4 files to start training!\")\n",
+                '        print(f"⚠️ No videos found in {data_dir}. Add some .mp4 files to start training!")\n',
                 "        return\n",
                 "        \n",
                 "    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)\n",
@@ -256,16 +256,16 @@ notebook = {
                 "    \n",
                 "    # Resume logic\n",
                 "    start_epoch = 0\n",
-                "    checkpoints = sorted(glob.glob(f\"{checkpoint_dir}/*.pth\"))\n",
+                '    checkpoints = sorted(glob.glob(f"{checkpoint_dir}/*.pth"))\n',
                 "    if checkpoints:\n",
                 "        latest_ckpt = checkpoints[-1]\n",
-                "        print(f\"🔄 Resuming from {latest_ckpt}\")\n",
+                '        print(f"🔄 Resuming from {latest_ckpt}")\n',
                 "        ckpt = torch.load(latest_ckpt, map_location=device)\n",
                 "        model.load_state_dict(ckpt['model_state_dict'])\n",
                 "        optimizer.load_state_dict(ckpt['optimizer_state_dict'])\n",
                 "        start_epoch = ckpt['epoch'] + 1\n",
                 "\n",
-                "    print(f\"\\n🚀 Starting training for {epochs - start_epoch} epochs...\")\n",
+                '    print(f"\\n🚀 Starting training for {epochs - start_epoch} epochs...")\n',
                 "    \n",
                 "    for epoch in range(start_epoch, epochs):\n",
                 "        model.train()\n",
@@ -299,24 +299,24 @@ notebook = {
                 "            total_loss += loss.item()\n",
                 "            \n",
                 "            if step % 10 == 0:\n",
-                "                print(f\"Epoch {epoch+1}/{epochs} | Step {step}/{len(loader)} | Loss: {loss.item():.4f}\")\n",
+                '                print(f"Epoch {epoch+1}/{epochs} | Step {step}/{len(loader)} | Loss: {loss.item():.4f}")\n',
                 "                \n",
                 "        avg_loss = total_loss / max(1, len(loader))\n",
                 "        epoch_time = time.time() - start_time\n",
-                "        print(f\"✅ Epoch {epoch+1} complete in {epoch_time:.1f}s | Avg Loss: {avg_loss:.4f}\")\n",
+                '        print(f"✅ Epoch {epoch+1} complete in {epoch_time:.1f}s | Avg Loss: {avg_loss:.4f}")\n',
                 "        \n",
                 "        # Save checkpoint to Google Drive\n",
-                "        save_path = f\"{checkpoint_dir}/jepa_finetuned_epoch{epoch+1}.pth\"\n",
+                '        save_path = f"{checkpoint_dir}/jepa_finetuned_epoch{epoch+1}.pth"\n',
                 "        torch.save({\n",
                 "            'epoch': epoch,\n",
                 "            'model_state_dict': model.state_dict(),\n",
                 "            'optimizer_state_dict': optimizer.state_dict(),\n",
                 "            'loss': avg_loss\n",
                 "        }, save_path)\n",
-                "        print(f\"💾 Saved checkpoint to Drive: {save_path}\\n\")\n",
+                '        print(f"💾 Saved checkpoint to Drive: {save_path}\\n")\n',
                 "\n",
-                "    print(\"🎉 Training Complete!\")"
-            ]
+                '    print("🎉 Training Complete!")',
+            ],
         },
         {
             "cell_type": "code",
@@ -329,28 +329,28 @@ notebook = {
                 "# Upload some MP4 dashcam videos to '/content/drive/MyDrive/OMNIDRIVE_PROJECT/data/videos'\n",
                 "# Then run this cell!\n",
                 "\n",
-                "train_jepa_colab(model, DATA_DIR, CHECKPOINT_DIR, epochs=5, batch_size=4)"
-            ]
-        }
+                "train_jepa_colab(model, DATA_DIR, CHECKPOINT_DIR, epochs=5, batch_size=4)",
+            ],
+        },
     ],
     "metadata": {
-        "colab": {
-            "provenance": []
-        },
-        "kernelspec": {
-            "display_name": "Python 3",
-            "name": "python3"
-        },
-        "language_info": {
-            "name": "python"
-        }
+        "colab": {"provenance": []},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"},
     },
     "nbformat": 4,
-    "nbformat_minor": 0
+    "nbformat_minor": 0,
 }
 
 import os
-os.makedirs("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks", exist_ok=True)
-with open("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/01_JEPA_FineTuning_Colab.ipynb", "w") as f:
+
+os.makedirs(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks",
+    exist_ok=True,
+)
+with open(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/01_JEPA_FineTuning_Colab.ipynb",
+    "w",
+) as f:
     json.dump(notebook, f, indent=2)
 print("Notebook created successfully.")

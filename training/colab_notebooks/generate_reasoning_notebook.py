@@ -11,8 +11,8 @@ notebook = {
                 "\n",
                 "This notebook fine-tunes a Vision-Language-Action (VLA) model (like LLaVA or Alpamayo) to handle **rare, long-tail scenarios** (e.g., soldier hand signals, flooded roads, unique checkpoints).\n",
                 "\n",
-                "To make a massive 7B-8B parameter model fit onto the free 16GB Colab T4 GPU, we use **4-bit Quantization** and **LoRA** (Low-Rank Adaptation), which only trains ~0.1% of the network."
-            ]
+                "To make a massive 7B-8B parameter model fit onto the free 16GB Colab T4 GPU, we use **4-bit Quantization** and **LoRA** (Low-Rank Adaptation), which only trains ~0.1% of the network.",
+            ],
         },
         {
             "cell_type": "code",
@@ -25,7 +25,7 @@ notebook = {
                 "from google.colab import drive\n",
                 "import os\n",
                 "\n",
-                "print(\"Mounting Google Drive...\")\n",
+                'print("Mounting Google Drive...")\n',
                 "drive.mount('/content/drive')\n",
                 "\n",
                 "# Create directories for VLA checkpoints and dataset\n",
@@ -34,10 +34,10 @@ notebook = {
                 "os.makedirs(VLA_CHECKPOINT_DIR, exist_ok=True)\n",
                 "os.makedirs(VLA_DATA_DIR, exist_ok=True)\n",
                 "\n",
-                "print(\"\\nInstalling advanced training libraries (PEFT, BitsAndBytes)...\")\n",
+                'print("\\nInstalling advanced training libraries (PEFT, BitsAndBytes)...")\n',
                 "!pip install -q torch torchvision transformers accelerate bitsandbytes peft datasets\n",
-                "print(\"✅ Dependencies installed!\")"
-            ]
+                'print("✅ Dependencies installed!")',
+            ],
         },
         {
             "cell_type": "code",
@@ -53,17 +53,17 @@ notebook = {
                 "OMNIDRIVE_SRC = '/content/OMNIDRIVE_PROJECT'\n",
                 "\n",
                 "if not os.path.exists(OMNIDRIVE_SRC):\n",
-                "    print(\"Copying OMNIDRIVE_PROJECT from your Google Drive...\")\n",
+                '    print("Copying OMNIDRIVE_PROJECT from your Google Drive...")\n',
                 "    drive_project_path = '/content/drive/MyDrive/OMNIDRIVE_PROJECT'\n",
                 "    if os.path.exists(drive_project_path):\n",
                 "        shutil.copytree(drive_project_path, OMNIDRIVE_SRC, dirs_exist_ok=True)\n",
-                "        print(\"✅ Copied source code.\")\n",
+                '        print("✅ Copied source code.")\n',
                 "\n",
                 "src_path = os.path.join(OMNIDRIVE_SRC, 'src')\n",
                 "if src_path not in sys.path:\n",
                 "    sys.path.append(src_path)\n",
-                "print(\"✅ Python path configured.\")"
-            ]
+                'print("✅ Python path configured.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -79,29 +79,29 @@ notebook = {
                 "import torch\n",
                 "from transformers import BitsAndBytesConfig, AutoProcessor, LlavaNextForConditionalGeneration\n",
                 "\n",
-                "print(\"Configuring 4-bit Quantization...\")\n",
+                'print("Configuring 4-bit Quantization...")\n',
                 "bnb_config = BitsAndBytesConfig(\n",
                 "    load_in_4bit=True,\n",
-                "    bnb_4bit_quant_type=\"nf4\",\n",
+                '    bnb_4bit_quant_type="nf4",\n',
                 "    bnb_4bit_compute_dtype=torch.bfloat16,\n",
                 "    bnb_4bit_use_double_quant=True,\n",
                 ")\n",
                 "\n",
                 "# We use LLaVA as the open-source VLA foundation\n",
-                "model_id = \"llava-hf/llava-v1.6-mistral-7b-hf\"\n",
+                'model_id = "llava-hf/llava-v1.6-mistral-7b-hf"\n',
                 "\n",
-                "print(f\"\\n📥 Downloading & Loading {model_id}...\")\n",
-                "print(\"This takes ~5 minutes as it downloads 14GB of weights.\")\n",
+                'print(f"\\n📥 Downloading & Loading {model_id}...")\n',
+                'print("This takes ~5 minutes as it downloads 14GB of weights.")\n',
                 "\n",
                 "processor = AutoProcessor.from_pretrained(model_id)\n",
                 "model = LlavaNextForConditionalGeneration.from_pretrained(\n",
                 "    model_id,\n",
                 "    quantization_config=bnb_config,\n",
-                "    device_map=\"auto\"\n",
+                '    device_map="auto"\n',
                 ")\n",
                 "\n",
-                "print(\"\\n✅ Model loaded successfully into 4-bit space!\")"
-            ]
+                'print("\\n✅ Model loaded successfully into 4-bit space!")',
+            ],
         },
         {
             "cell_type": "code",
@@ -115,24 +115,24 @@ notebook = {
                 "\n",
                 "from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training\n",
                 "\n",
-                "print(\"Preparing model for k-bit training...\")\n",
+                'print("Preparing model for k-bit training...")\n',
                 "model = prepare_model_for_kbit_training(model)\n",
                 "\n",
                 "lora_config = LoraConfig(\n",
                 "    r=16,\n",
                 "    lora_alpha=32,\n",
-                "    target_modules=[\"q_proj\", \"v_proj\", \"k_proj\", \"o_proj\"], # Target attention blocks\n",
+                '    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"], # Target attention blocks\n',
                 "    lora_dropout=0.05,\n",
-                "    bias=\"none\",\n",
-                "    task_type=\"CAUSAL_LM\"\n",
+                '    bias="none",\n',
+                '    task_type="CAUSAL_LM"\n',
                 ")\n",
                 "\n",
                 "model = get_peft_model(model, lora_config)\n",
                 "\n",
-                "print(\"\\n✅ LoRA Applied!\")\n",
+                'print("\\n✅ LoRA Applied!")\n',
                 "model.print_trainable_parameters()\n",
-                "# You should see that less than 0.2% of parameters are trainable!"
-            ]
+                "# You should see that less than 0.2% of parameters are trainable!",
+            ],
         },
         {
             "cell_type": "code",
@@ -149,19 +149,19 @@ notebook = {
                 "import torch.utils.data as data\n",
                 "\n",
                 "# Create a dummy dataset file if you don't have one yet\n",
-                "dummy_data_path = f\"{VLA_DATA_DIR}/rare_scenarios.json\"\n",
+                'dummy_data_path = f"{VLA_DATA_DIR}/rare_scenarios.json"\n',
                 "if not os.path.exists(dummy_data_path):\n",
                 "    dummy_data = [\n",
                 "        {\n",
-                "            \"image\": \"soldier_stop.jpg\",\n",
-                "            \"prompt\": \"[INST] <image>\\nWhat should the vehicle do? [/INST]\",\n",
-                "            \"completion\": \"STOP. A uniformed soldier is displaying a hand stop signal directly in the vehicle's path.\"\n",
+                '            "image": "soldier_stop.jpg",\n',
+                '            "prompt": "[INST] <image>\\nWhat should the vehicle do? [/INST]",\n',
+                '            "completion": "STOP. A uniformed soldier is displaying a hand stop signal directly in the vehicle\'s path."\n',
                 "        }\n",
                 "    ]\n",
                 "    with open(dummy_data_path, 'w') as f:\n",
                 "        json.dump(dummy_data, f)\n",
-                "    print(f\"⚠️ Created a template dataset at {dummy_data_path}\")\n",
-                "    print(\"You need to replace this with your actual images and JSON labels!\")\n",
+                '    print(f"⚠️ Created a template dataset at {dummy_data_path}")\n',
+                '    print("You need to replace this with your actual images and JSON labels!")\n',
                 "\n",
                 "class VLADataset(data.Dataset):\n",
                 "    def __init__(self, json_path, img_dir, processor):\n",
@@ -185,20 +185,20 @@ notebook = {
                 "\n",
                 "        text = sample['prompt'] + \" \" + sample['completion']\n",
                 "        \n",
-                "        inputs = self.processor(text=text, images=image, return_tensors=\"pt\", padding=\"max_length\", max_length=128, truncation=True)\n",
+                '        inputs = self.processor(text=text, images=image, return_tensors="pt", padding="max_length", max_length=128, truncation=True)\n',
                 "        \n",
                 "        # Remove batch dimension added by processor\n",
                 "        item = {k: v.squeeze(0) for k, v in inputs.items()}\n",
                 "        # The labels for language modeling are the input_ids themselves\n",
-                "        item[\"labels\"] = item[\"input_ids\"].clone()\n",
+                '        item["labels"] = item["input_ids"].clone()\n',
                 "        # Ignore padding tokens in loss calculation\n",
-                "        item[\"labels\"][item[\"attention_mask\"] == 0] = -100 \n",
+                '        item["labels"][item["attention_mask"] == 0] = -100 \n',
                 "        \n",
                 "        return item\n",
                 "\n",
                 "dataset = VLADataset(dummy_data_path, VLA_DATA_DIR, processor)\n",
-                "print(f\"✅ Dataset loaded with {len(dataset)} examples.\")"
-            ]
+                'print(f"✅ Dataset loaded with {len(dataset)} examples.")',
+            ],
         },
         {
             "cell_type": "code",
@@ -218,9 +218,9 @@ notebook = {
                 "    fp16=True,                      # Mixed precision\n",
                 "    logging_steps=10,\n",
                 "    max_steps=200,                  # Short training run for demonstration\n",
-                "    save_strategy=\"steps\",\n",
+                '    save_strategy="steps",\n',
                 "    save_steps=100,\n",
-                "    optim=\"paged_adamw_8bit\",       # Memory efficient optimizer\n",
+                '    optim="paged_adamw_8bit",       # Memory efficient optimizer\n',
                 ")\n",
                 "\n",
                 "# Data collator to batch our items\n",
@@ -238,14 +238,14 @@ notebook = {
                 "    data_collator=collate_fn,\n",
                 ")\n",
                 "\n",
-                "print(\"\\n🚀 Starting LoRA Fine-Tuning...\")\n",
+                'print("\\n🚀 Starting LoRA Fine-Tuning...")\n',
                 "try:\n",
                 "    # Uncomment to actually run training when images are uploaded!\n",
                 "    # trainer.train()\n",
-                "    print(\"Training logic is ready! Upload your images to VLA_DATA_DIR and uncomment trainer.train()\")\n",
+                '    print("Training logic is ready! Upload your images to VLA_DATA_DIR and uncomment trainer.train()")\n',
                 "except Exception as e:\n",
-                "    print(f\"Training error (expected if dummy data): {e}\")"
-            ]
+                '    print(f"Training error (expected if dummy data): {e}")',
+            ],
         },
         {
             "cell_type": "code",
@@ -257,33 +257,31 @@ notebook = {
                 "# ======================\n",
                 "# When training is done, we save the LoRA adapters to Google Drive.\n",
                 "\n",
-                "final_save_path = f\"{VLA_CHECKPOINT_DIR}/omnidrive_reasoning_v1\"\n",
+                'final_save_path = f"{VLA_CHECKPOINT_DIR}/omnidrive_reasoning_v1"\n',
                 "# trainer.model.save_pretrained(final_save_path)\n",
                 "# processor.save_pretrained(final_save_path)\n",
                 "\n",
-                "print(f\"\\n💾 Final adapters will be saved to: {final_save_path}\")\n",
-                "print(\"These adapter weights are tiny (~20MB) and sit on top of the base LLaVA model during inference in the car.\")"
-            ]
-        }
+                'print(f"\\n💾 Final adapters will be saved to: {final_save_path}")\n',
+                'print("These adapter weights are tiny (~20MB) and sit on top of the base LLaVA model during inference in the car.")',
+            ],
+        },
     ],
     "metadata": {
-        "colab": {
-            "provenance": []
-        },
-        "kernelspec": {
-            "display_name": "Python 3",
-            "name": "python3"
-        },
-        "language_info": {
-            "name": "python"
-        }
+        "colab": {"provenance": []},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"},
     },
     "nbformat": 4,
-    "nbformat_minor": 0
+    "nbformat_minor": 0,
 }
 
-import os
-os.makedirs("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks", exist_ok=True)
-with open("c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/03_Reasoning_Module_Colab.ipynb", "w") as f:
+os.makedirs(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks",
+    exist_ok=True,
+)
+with open(
+    "c:/Users/majip/Downloads/rl-jepa-car ai/OMNIDRIVE_PROJECT/training/colab_notebooks/03_Reasoning_Module_Colab.ipynb",
+    "w",
+) as f:
     json.dump(notebook, f, indent=2)
 print("Reasoning Notebook created successfully.")

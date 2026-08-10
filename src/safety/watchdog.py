@@ -1,10 +1,10 @@
 """Software and hardware watchdog for OMNIDRIVE safety system."""
+
+import logging
 import threading
 import time
-import logging
-from enum import IntEnum
-from dataclasses import dataclass, field
-from typing import Dict, Callable, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
 
 
 @dataclass
@@ -20,18 +20,16 @@ class Watchdog:
     def __init__(self, heartbeat_interval_ms: float = 100.0, miss_limit: int = 3):
         self.heartbeat_interval = heartbeat_interval_ms / 1000.0
         self.miss_limit = miss_limit
-        self._modules: Dict[str, dict] = {}
-        self._status: Dict[str, ModuleStatus] = {}
+        self._modules: dict[str, dict] = {}
+        self._status: dict[str, ModuleStatus] = {}
         self._lock = threading.Lock()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self.logger = logging.getLogger(__name__)
 
     def register_module(self, name: str, callback_on_failure: Callable):
         with self._lock:
-            self._modules[name] = {
-                "callback": callback_on_failure
-            }
+            self._modules[name] = {"callback": callback_on_failure}
             self._status[name] = ModuleStatus(last_heartbeat=time.time())
             self.logger.info(f"Registered module {name} with watchdog.")
 
@@ -47,7 +45,9 @@ class Watchdog:
             if self._running:
                 return
             self._running = True
-            self._thread = threading.Thread(target=self._monitor_loop, daemon=True, name="WatchdogMonitor")
+            self._thread = threading.Thread(
+                target=self._monitor_loop, daemon=True, name="WatchdogMonitor"
+            )
             self._thread.start()
             self.logger.info("Watchdog started.")
 
@@ -66,12 +66,14 @@ class Watchdog:
                 for name, status in self._status.items():
                     if not status.is_healthy:
                         continue
-                    
+
                     time_since_last = now - status.last_heartbeat
                     if time_since_last > self.heartbeat_interval:
                         status.miss_count += 1
-                        self.logger.warning(f"Module {name} missed heartbeat. Miss count: {status.miss_count}")
-                        
+                        self.logger.warning(
+                            f"Module {name} missed heartbeat. Miss count: {status.miss_count}"
+                        )
+
                         if status.miss_count >= self.miss_limit:
                             status.is_healthy = False
                             self.logger.critical(f"CRITICAL: Module {name} failed watchdog check!")
@@ -81,7 +83,14 @@ class Watchdog:
                             except Exception as e:
                                 self.logger.error(f"Error in watchdog callback for {name}: {e}")
 
-    def get_status(self) -> Dict[str, ModuleStatus]:
+    def get_status(self) -> dict[str, ModuleStatus]:
         with self._lock:
             # Return a copy to ensure thread safety
-            return {name: ModuleStatus(last_heartbeat=s.last_heartbeat, miss_count=s.miss_count, is_healthy=s.is_healthy) for name, s in self._status.items()}
+            return {
+                name: ModuleStatus(
+                    last_heartbeat=s.last_heartbeat,
+                    miss_count=s.miss_count,
+                    is_healthy=s.is_healthy,
+                )
+                for name, s in self._status.items()
+            }

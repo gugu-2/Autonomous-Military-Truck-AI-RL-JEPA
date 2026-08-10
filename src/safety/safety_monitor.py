@@ -1,8 +1,7 @@
 """Master safety monitor — watches all 7 AI layers for anomalies."""
-import threading
-import time
+
 import logging
-from typing import Optional
+import threading
 from dataclasses import dataclass
 from enum import Enum
 
@@ -10,10 +9,12 @@ from enum import Enum
 from .failsafe_controller import FailsafeController, SafetyFlag
 from .watchdog import Watchdog
 
+
 class SystemSafetyState(Enum):
     NOMINAL = 0
     DEGRADED = 1
     FAILSAFE_ACTIVE = 2
+
 
 @dataclass
 class DrivingAction:
@@ -21,12 +22,14 @@ class DrivingAction:
     throttle: float
     brake: float
 
+
 @dataclass
 class SensorHealthStatus:
     lidar_ok: bool
     camera_ok: bool
     radar_ok: bool
     gnss_ok: bool
+
 
 class SafetyMonitor:
     def __init__(self, config, watchdog: Watchdog, failsafe: FailsafeController):
@@ -45,8 +48,15 @@ class SafetyMonitor:
             return SafetyFlag.WARN
         return SafetyFlag.NOMINAL
 
-    def check_rl_output(self, action: DrivingAction, prev_action: DrivingAction, dt: float) -> SafetyFlag:
-        if action.steering > 1.0 or action.steering < -1.0 or action.throttle > 1.0 or action.brake > 1.0:
+    def check_rl_output(
+        self, action: DrivingAction, prev_action: DrivingAction, dt: float
+    ) -> SafetyFlag:
+        if (
+            action.steering > 1.0
+            or action.steering < -1.0
+            or action.throttle > 1.0
+            or action.brake > 1.0
+        ):
             return SafetyFlag.FAILSAFE
         # Simple rate limit check
         if dt > 0 and abs(action.steering - prev_action.steering) / dt > 5.0:
@@ -67,13 +77,20 @@ class SafetyMonitor:
             return SafetyFlag.WARN
         return SafetyFlag.NOMINAL
 
-    def full_check(self, jepa_latency: float, hazard_energy: float, action: DrivingAction, prev_action: DrivingAction, sensor_health: SensorHealthStatus) -> SafetyFlag:
+    def full_check(
+        self,
+        jepa_latency: float,
+        hazard_energy: float,
+        action: DrivingAction,
+        prev_action: DrivingAction,
+        sensor_health: SensorHealthStatus,
+    ) -> SafetyFlag:
         flags = [
             self.check_jepa_health(jepa_latency, hazard_energy),
-            self.check_rl_output(action, prev_action, 0.05), # assuming 20Hz dt
-            self.check_sensor_health(sensor_health)
+            self.check_rl_output(action, prev_action, 0.05),  # assuming 20Hz dt
+            self.check_sensor_health(sensor_health),
         ]
-        
+
         worst_flag = max(flags, key=lambda f: f.value)
 
         with self._lock:
@@ -89,7 +106,7 @@ class SafetyMonitor:
                 if self._state != SystemSafetyState.FAILSAFE_ACTIVE:
                     self._state = SystemSafetyState.FAILSAFE_ACTIVE
                     self.failsafe.trigger_failsafe("Safety checks failed", worst_flag)
-        
+
         return worst_flag
 
     def get_system_state(self) -> SystemSafetyState:

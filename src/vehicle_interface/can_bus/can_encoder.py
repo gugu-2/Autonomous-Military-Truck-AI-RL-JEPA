@@ -1,9 +1,10 @@
 """Encodes AI driving commands into CAN bus frames."""
+
 import struct
-import math
-import can
 from dataclasses import dataclass
-from typing import List
+
+import can
+
 
 @dataclass
 class DrivingAction:
@@ -12,9 +13,10 @@ class DrivingAction:
     brake: float
     gear: int
 
+
 class CANCommandEncoder:
     """Encodes vehicle control signals into specific CAN frames."""
-    
+
     def encode_steering(self, angle_deg: float) -> can.Message:
         """
         CAN ID 0x100
@@ -25,15 +27,15 @@ class CANCommandEncoder:
         """
         # Clamp value
         angle_deg = max(-45.0, min(45.0, angle_deg))
-        
+
         # Apply offset and scale
         raw_val = int((angle_deg + 45.0) / 0.01)
-        
+
         # Pack into 2 bytes (uint16), little endian
-        data = struct.pack('<H', raw_val)
+        data = struct.pack("<H", raw_val)
         # Pad to 8 bytes DLC
-        data += b'\x00' * 6
-        
+        data += b"\x00" * 6
+
         return can.Message(arbitration_id=0x100, data=data, is_extended_id=False)
 
     def encode_throttle(self, value: float) -> can.Message:
@@ -43,10 +45,10 @@ class CANCommandEncoder:
         """
         value = max(0.0, min(1.0, value))
         raw_val = int(value * 255.0)
-        
-        data = struct.pack('<B', raw_val)
-        data += b'\x00' * 7
-        
+
+        data = struct.pack("<B", raw_val)
+        data += b"\x00" * 7
+
         return can.Message(arbitration_id=0x101, data=data, is_extended_id=False)
 
     def encode_brake(self, value: float) -> can.Message:
@@ -56,10 +58,10 @@ class CANCommandEncoder:
         """
         value = max(0.0, min(1.0, value))
         raw_val = int(value * 255.0)
-        
-        data = struct.pack('<B', raw_val)
-        data += b'\x00' * 7
-        
+
+        data = struct.pack("<B", raw_val)
+        data += b"\x00" * 7
+
         return can.Message(arbitration_id=0x102, data=data, is_extended_id=False)
 
     def encode_gear(self, gear: int) -> can.Message:
@@ -68,9 +70,9 @@ class CANCommandEncoder:
         Gear encoding: 0=Park, 1=Reverse, 2=Neutral, 3=Drive
         """
         gear = max(0, min(3, gear))
-        data = struct.pack('<B', gear)
-        data += b'\x00' * 7
-        
+        data = struct.pack("<B", gear)
+        data += b"\x00" * 7
+
         return can.Message(arbitration_id=0x103, data=data, is_extended_id=False)
 
     def encode_heartbeat(self, counter: int) -> can.Message:
@@ -79,16 +81,16 @@ class CANCommandEncoder:
         Watchdog heartbeat message to keep drive-by-wire active.
         """
         raw_val = counter % 256
-        data = struct.pack('<B', raw_val)
-        data += b'\x00' * 7
-        
+        data = struct.pack("<B", raw_val)
+        data += b"\x00" * 7
+
         return can.Message(arbitration_id=0x0FF, data=data, is_extended_id=False)
 
-    def encode_action(self, action: DrivingAction) -> List[can.Message]:
+    def encode_action(self, action: DrivingAction) -> list[can.Message]:
         """Encodes a full driving action into a list of CAN messages."""
         return [
             self.encode_steering(action.steering_angle),
             self.encode_throttle(action.throttle),
             self.encode_brake(action.brake),
-            self.encode_gear(action.gear)
+            self.encode_gear(action.gear),
         ]

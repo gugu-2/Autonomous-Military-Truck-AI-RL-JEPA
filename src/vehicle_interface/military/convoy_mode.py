@@ -1,10 +1,11 @@
 """Military convoy leader-follower mode for OMNIDRIVE."""
-import time
+
 import logging
+import time
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
+
 
 # Forward declare for type hinting purposes
 @dataclass
@@ -14,12 +15,14 @@ class DrivingAction:
     brake: float
     gear: int
 
+
 @dataclass
 class EgoPose:
     x: float
     y: float
     heading: float
     speed_ms: float
+
 
 @dataclass
 class VehicleConvoyState:
@@ -30,17 +33,20 @@ class VehicleConvoyState:
     heading: float
     timestamp: float
 
+
 class ConvoyMode:
     """Handles military leader-follower logistics logic."""
-    
-    def __init__(self, target_gap_m: float = 15.0, gap_tolerance_m: float = 2.0, max_speed_kmh: float = 80.0):
+
+    def __init__(
+        self, target_gap_m: float = 15.0, gap_tolerance_m: float = 2.0, max_speed_kmh: float = 80.0
+    ):
         self.target_gap_m = target_gap_m
         self.gap_tolerance_m = gap_tolerance_m
         self.max_speed_ms = max_speed_kmh / 3.6
-        
-        self.leader_state: Optional[VehicleConvoyState] = None
+
+        self.leader_state: VehicleConvoyState | None = None
         self._is_leader_flag = False
-        
+
         # PID Controller state for gap maintenance
         self.kp = 0.5
         self.ki = 0.05
@@ -56,7 +62,9 @@ class ConvoyMode:
         """Receive telemetry from the convoy leader."""
         self.leader_state = state
 
-    def compute_follower_action(self, ego_state: EgoPose, current_action: DrivingAction) -> DrivingAction:
+    def compute_follower_action(
+        self, ego_state: EgoPose, current_action: DrivingAction
+    ) -> DrivingAction:
         """PID-based gap control adjusting the base driving action."""
         if not self.leader_state:
             logger.warning("No leader state available. Halting.")
@@ -67,15 +75,15 @@ class ConvoyMode:
         dt = current_time - self.last_time
         if dt <= 0:
             dt = 0.01
-            
+
         # Compute distance to leader
         dx = self.leader_state.x - ego_state.x
         dy = self.leader_state.y - ego_state.y
-        distance = (dx**2 + dy**2)**0.5
-        
+        distance = (dx**2 + dy**2) ** 0.5
+
         # Error term
         error = distance - self.target_gap_m
-        
+
         # Anti-windup
         if abs(error) < self.gap_tolerance_m:
             self.integral_error = 0.0
@@ -83,19 +91,21 @@ class ConvoyMode:
             self.integral_error += error * dt
             # Clamp integral
             self.integral_error = max(-10.0, min(10.0, self.integral_error))
-            
+
         derivative = (error - self.last_error) / dt
-        
+
         # PID Output (target speed adjustment)
-        speed_adjustment = (self.kp * error) + (self.ki * self.integral_error) + (self.kd * derivative)
+        speed_adjustment = (
+            (self.kp * error) + (self.ki * self.integral_error) + (self.kd * derivative)
+        )
         target_speed = self.leader_state.speed_ms + speed_adjustment
-        
+
         # Clamp target speed
         target_speed = max(0.0, min(self.max_speed_ms, target_speed))
-        
+
         self.last_error = error
         self.last_time = current_time
-        
+
         # Translate speed into throttle/brake adjustments
         if target_speed > ego_state.speed_ms + 0.5:
             current_action.throttle = min(1.0, current_action.throttle + 0.1)
@@ -103,7 +113,7 @@ class ConvoyMode:
         elif target_speed < ego_state.speed_ms - 0.5:
             current_action.throttle = 0.0
             current_action.brake = min(1.0, current_action.brake + 0.2)
-            
+
         return current_action
 
     def broadcast_state(self, ego_state: EgoPose, vehicle_id: str = "VEH_1") -> VehicleConvoyState:
@@ -114,7 +124,7 @@ class ConvoyMode:
             y=ego_state.y,
             speed_ms=ego_state.speed_ms,
             heading=ego_state.heading,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
     def emergency_convoy_halt(self):
