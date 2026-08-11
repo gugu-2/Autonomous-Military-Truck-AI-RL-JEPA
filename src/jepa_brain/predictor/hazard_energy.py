@@ -31,13 +31,21 @@ class HazardEnergyComputer:
 
     def compute_spatial_map(self, energy: torch.Tensor, grid_size: int = 16) -> torch.Tensor:
         """Reshapes token energies to spatial grid (B, H, W)."""
-        B, N = energy.shape
+        if energy.dim() == 2:
+            B, N = energy.shape
+        elif energy.dim() == 3:
+            B, K, N = energy.shape
+            energy = energy.mean(dim=1)  # average over horizon
+        else:
+            raise ValueError(f"Unexpected energy shape: {energy.shape}")
         assert N == grid_size * grid_size, f"Expected {grid_size*grid_size} tokens, got {N}"
         spatial_map = energy.view(B, grid_size, grid_size)
         return spatial_map
 
     def get_max_hazard(self, energy_map: torch.Tensor) -> tuple[float, int, int]:
         """Returns max energy + location."""
+        if energy_map.dim() == 4:
+            energy_map = energy_map[0].mean(0)
         if energy_map.dim() == 3:
             energy_map = energy_map[0]
         max_val = torch.max(energy_map).item()

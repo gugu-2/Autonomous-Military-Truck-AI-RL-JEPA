@@ -12,10 +12,12 @@ class LidarEncoder(nn.Module):
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
+            nn.AdaptiveAvgPool2d((8, 8)),
             nn.Flatten(),
-            nn.Linear(64 * 56 * 56, embed_dim),  # Assuming 224x224 input
+            nn.Linear(64 * 8 * 8, embed_dim),
         )
 
     def forward(self, bev_grid: torch.Tensor) -> torch.Tensor:
         # Expected input: (Batch, 1, 224, 224)
-        return self.conv(bev_grid)
+        output = self.conv(bev_grid)
+        return output.unsqueeze(1)

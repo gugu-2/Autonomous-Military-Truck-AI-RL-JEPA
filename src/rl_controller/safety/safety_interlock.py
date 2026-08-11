@@ -49,58 +49,71 @@ class SafetyInterlock:
 
         safe_action = DrivingAction(**proposed_action.__dict__)
 
+        flag = SafetyFlag.SAFE
+        msg = "No safety violations detected."
+
         # Check 1: JEPA Hazard Energy Emergency
         if hazard_energy >= self.emergency_threshold:
             safe_action.throttle = 0.0
             safe_action.brake = 1.0
-            safe_action.steering = prev_action.steering if prev_action else 0.0
-            return (
-                safe_action,
-                SafetyFlag.EMERGENCY_STOP,
-                f"Hazard energy {hazard_energy:.2f} >= {self.emergency_threshold}",
-            )
-
+            flag = SafetyFlag.EMERGENCY_STOP
+            msg = f"Hazard energy {hazard_energy:.2f} >= {self.emergency_threshold}"
         # Check 2: Minimum TTC Failsafe
-        ttc = self.compute_ttc(world_state, world_state.speed)
-        if ttc < self.min_ttc:
-            safe_action.throttle = 0.0
-            safe_action.brake = 1.0
-            return safe_action, SafetyFlag.FAILSAFE, f"TTC {ttc:.2f}s < {self.min_ttc}s"
+        else:
+            ttc = self.compute_ttc(world_state, world_state.speed)
+            if ttc < self.min_ttc:
+                safe_action.throttle = 0.0
+                safe_action.brake = 1.0
+                flag = SafetyFlag.FAILSAFE
+                msg = f"TTC {ttc:.2f}s < {self.min_ttc}s"
+            else:
+                # Check 4: School Zone Speed Limit
+                in_school_zone = getattr(world_state, "in_school_zone", False)
+                if in_school_zone and world_state.speed >= self.school_zone_speed_limit:
+                    safe_action.throttle = 0.0
+                    safe_action.brake = max(0.2, safe_action.brake)
+                    flag = SafetyFlag.SPEED_LIMITED
+                    msg = f"School zone limit enforced (Speed: {world_state.speed * 3.6:.1f} km/h)"
+                else:
+                    # Check 5: Stopping Distance Constraint
+                    stop_dist = self.compute_stopping_distance(world_state.speed)
+                    clear_dist = getattr(world_state, "clear_path_distance", 100.0)
+                    if stop_dist > clear_dist * 0.8:
+                        safe_action.throttle = 0.0
+                        safe_action.brake = max(0.5, safe_action.brake)
+                        flag = SafetyFlag.FAILSAFE
+                        msg = (
+                            f"Stopping distance {stop_dist:.1f}m > 80% clear path {clear_dist:.1f}m"
+                        )
 
-        # Check 4: School Zone Speed Limit
-        in_school_zone = getattr(world_state, "in_school_zone", False)
-        if in_school_zone and world_state.speed >= self.school_zone_speed_limit:
-            safe_action.throttle = 0.0
-            safe_action.brake = max(0.2, safe_action.brake)
-            return (
-                safe_action,
-                SafetyFlag.SPEED_LIMITED,
-                f"School zone limit enforced (Speed: {world_state.speed * 3.6:.1f} km/h)",
-            )
-
-        # Check 5: Stopping Distance Constraint
-        stop_dist = self.compute_stopping_distance(world_state.speed)
-        clear_dist = getattr(world_state, "clear_path_distance", 100.0)
-        if stop_dist > clear_dist * 0.8:
-            safe_action.throttle = 0.0
-            safe_action.brake = max(0.5, safe_action.brake)
-            return (
-                safe_action,
-                SafetyFlag.FAILSAFE,
-                f"Stopping distance {stop_dist:.1f}m > 80% clear path {clear_dist:.1f}m",
-            )
-
-        # Check 3: Steering Rate Clamping
+        # Check 3: Steering Rate Clamping (Always applied last)
         if prev_action is not None:
             dt = 0.1  # assuming 10Hz control
+            # If an emergency stop or failsafe triggered, we probably still want to clamp steering
+            # or maybe not? The prompt says: "steering rate clamping is ALWAYS applied last, even if other checks return early."
+            # So we do it here.
             steer_delta = safe_action.steering - prev_action.steering
             max_delta = self.max_steering_rate * dt
             if abs(steer_delta) > max_delta:
                 safe_action.steering = prev_action.steering + np.sign(steer_delta) * max_delta
-                return (
-                    safe_action,
-                    SafetyFlag.CLAMPED,
-                    f"Steering rate clamped to {self.max_steering_rate} rad/s",
-                )
+                # If we were SAFE before, now we are CLAMPED
+                if flag == SafetyFlag.SAFE:
+                    flag = SafetyFlag.CLAMPED
+                    msg = f"Steering rate clamped to {self.max_steering_rate} rad/s"
 
-        return safe_action, SafetyFlag.SAFE, "No safety violations detected."
+        return safe_action, flag, msg
+
+    def trigger_emergency_brake(self, reason: str = "Manual trigger") -> DrivingAction:
+        """Force emergency brake action regardless of RL output."""
+        import logging
+
+        logging.getLogger(__name__).critical(f"Emergency brake triggered: {reason}")
+        return DrivingAction(steering=0.0, throttle=0.0, brake=1.0)
+
+    def apply_caution_limits(
+        self, action: DrivingAction, max_speed_kmh: float = 30.0
+    ) -> DrivingAction:
+        """Apply reduced speed and gentle braking for caution zones."""
+        action.throttle = min(action.throttle, 0.3)
+        action.steering = max(-20.0, min(20.0, action.steering))
+        return action

@@ -6,10 +6,11 @@ import time
 from enum import Enum
 from typing import Any
 
-from .safety.black_box_logger import BlackBoxLogger
-from .safety.failsafe_controller import FailsafeController, SafetyFlag
-from .safety.safety_monitor import DrivingAction, SafetyMonitor, SensorHealthStatus
-from .safety.watchdog import Watchdog
+from safety.black_box_logger import BlackBoxLogger
+from safety.failsafe_controller import FailsafeController, SafetyFlag
+from safety.safety_monitor import SafetyMonitor
+from safety.watchdog import Watchdog
+from utils.common_types import DrivingAction, SensorHealthStatus
 
 
 class VehicleMode(Enum):
@@ -19,63 +20,87 @@ class VehicleMode(Enum):
     EMERGENCY = 3
 
 
-# Stub classes representing the other layers
-class SensorFusionEngine:
-    def fuse(self):
-        return {"data": "fused_sensors"}
+# Real imports with stub fallbacks
+try:
+    from sensor_fusion.fusion.sensor_fusion_engine import SensorFusionEngine
+except ImportError:
+
+    class SensorFusionEngine:
+        def fuse(self):
+            return {"data": "fused_sensors"}
 
 
-class JEPAWorldModel:
-    def encode(self, sensors):
-        return {"latent": "state", "hazard_energy": 1.0}
+try:
+    from jepa_brain.world_model.jepa_world_model import JEPAWorldModel
+except ImportError:
+
+    class JEPAWorldModel:
+        def encode(self, sensors):
+            return {"latent": "state", "hazard_energy": 1.0}
 
 
-class DrivingPolicy:
-    def get_action(self, state):
-        return DrivingAction(steering=0.0, throttle=0.5, brake=0.0)
+try:
+    from rl_controller.policy.driving_policy import DrivingPolicy
+except ImportError:
+
+    class DrivingPolicy:
+        def get_action(self, state):
+            return DrivingAction(steering_angle=0.0, throttle=0.5, brake=0.0, gear=1)
 
 
-class ImaginationEngine:
-    def imagine_and_filter(self, actions):
-        return actions
+try:
+    from jepa_brain.world_model.imagination_engine import ImaginationEngine
+except ImportError:
+
+    class ImaginationEngine:
+        def imagine_and_filter(self, actions):
+            return actions
 
 
-class ReasoningModule:
-    def get_hints(self):
-        return None
+
+try:
+    from rl_controller.safety.safety_interlock import SafetyInterlock
+except ImportError:
+
+    class SafetyInterlock:
+        def check_and_override(self, action):
+            return action
 
 
-class SafetyInterlock:
-    def check_and_override(self, action):
-        return action
+try:
+    from navigation.autoware_bridge.autoware_ros2_bridge import AutowareROS2Bridge as AutowareBridge
+except ImportError:
+
+    class AutowareBridge:
+        def send(self, action):
+            pass
 
 
-class AutowareBridge:
-    def send(self, action):
-        pass
+try:
+    from vehicle_interface.robotaxi.dbw_driver import DBWDriver as VehicleInterface
+except ImportError:
 
+    class VehicleInterface:
+        def send_command(self, action):
+            pass
 
-class VehicleInterface:
-    def send_command(self, action):
-        pass
+        def get_current_speed(self):
+            return 10.0
 
-    def get_current_speed(self):
-        return 10.0
+        def apply_max_brake(self):
+            pass
 
-    def apply_max_brake(self):
-        pass
+        def disable_drive_power(self):
+            pass
 
-    def disable_drive_power(self):
-        pass
+        def apply_brake_for_deceleration(self, decel):
+            pass
 
-    def apply_brake_for_deceleration(self, decel):
-        pass
+        def apply_parking_brake(self):
+            pass
 
-    def apply_parking_brake(self):
-        pass
-
-    def send_can_message(self, can_id, data):
-        pass
+        def send_can_message(self, can_id, data):
+            pass
 
 
 class OmniDriveBrain:
@@ -89,7 +114,7 @@ class OmniDriveBrain:
         self.jepa = JEPAWorldModel()
         self.policy = DrivingPolicy()
         self.imagination = ImaginationEngine()
-        self.reasoning = ReasoningModule()
+
         self.interlock = SafetyInterlock()
         self.autoware = AutowareBridge()
         self.vehicle = VehicleInterface()
@@ -102,7 +127,7 @@ class OmniDriveBrain:
         self._running = False
         self._thread = None
         self.frame_count = 0
-        self.prev_action = DrivingAction(0.0, 0.0, 0.0)
+        self.prev_action = DrivingAction(0.0, 0.0, 0.0, 0)
 
         # Register modules to watchdog
         self.watchdog.register_module("sensor_fusion", self._module_failure_handler)
@@ -169,9 +194,6 @@ class OmniDriveBrain:
 
                 # 5. Imagination Filter
                 filtered_action = self.imagination.imagine_and_filter(action)
-
-                # 6. Reasoning Module (Async stub)
-                hints = self.reasoning.get_hints()
 
                 # 7. Safety Interlock
                 final_action = self.interlock.check_and_override(filtered_action)

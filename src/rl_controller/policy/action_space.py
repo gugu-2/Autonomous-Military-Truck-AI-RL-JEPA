@@ -128,6 +128,7 @@ class ActionSpace:
 
     def from_tensor(self, tensor: torch.Tensor) -> DrivingAction:
         """Converts RL tensor back to DrivingAction."""
+        tensor = tensor.squeeze()  # Handle both (dim,) and (1, dim) inputs
         t = tensor.detach().cpu().numpy()
         action = DrivingAction(steering=float(t[0]), throttle=float(t[1]), brake=float(t[2]))
         if self.vehicle_mode == VehicleMode.TRUCK and len(t) >= 5:
@@ -148,3 +149,7 @@ class ActionSpace:
             and np.isclose(a.trailer_brake, action.trailer_brake)
             and np.isclose(a.retarder, action.retarder)
         )
+
+    def decode(self, tensor: torch.Tensor):
+        """Alias for from_tensor()."""
+        return self.from_tensor(tensor)

@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from rl_controller.dreamer.actor_critic import Actor, Critic
 from rl_controller.dreamer.rssm import RSSM
-from rl_controller.policy.action_space import ActionSpace
+from rl_controller.policy.action_space import ActionSpace, VehicleMode
 
 
 class DreamerV3Agent(nn.Module):
@@ -38,7 +38,8 @@ class DreamerV3Agent(nn.Module):
         self.critic = Critic(feat_dim=feat_dim)
 
         # Action space for decoding network outputs
-        self.action_space = ActionSpace(config.get("vehicle_mode", "robotaxi"))
+        v_mode = config.get("vehicle_mode", "ROBOTAXI").upper()
+        self.action_space = ActionSpace(config, VehicleMode[v_mode])
 
     def policy(
         self,
@@ -64,7 +65,7 @@ class DreamerV3Agent(nn.Module):
         if explore:
             action = action_dist.sample()
         else:
-            action = action_dist.mode
+            action = action_dist.mean
 
         return action, post_state
 
@@ -94,6 +95,7 @@ class DreamerV3Agent(nn.Module):
         actions = torch.stack(actions, dim=1)
 
         # Evaluate states with critic
-        values = self.critic(features).mode
+        critic_logits = self.critic(features)
+        values = self.critic.expected_value(critic_logits)
 
         return features, actions, values

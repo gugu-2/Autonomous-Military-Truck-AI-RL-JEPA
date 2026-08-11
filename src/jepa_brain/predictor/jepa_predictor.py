@@ -15,7 +15,15 @@ class TemporalPositionEmbedding(nn.Module):
 
 
 class JEPAPredictor(nn.Module):
-    def __init__(self, embed_dim=512, depth=6, num_heads=8, prediction_horizon=10, mlp_ratio=4.0):
+    def __init__(
+        self,
+        embed_dim=512,
+        depth=6,
+        num_heads=8,
+        prediction_horizon=10,
+        mlp_ratio=4.0,
+        action_dim: int = 3,
+    ):
         super().__init__()
         self.embed_dim = embed_dim
         self.prediction_horizon = prediction_horizon
@@ -32,7 +40,7 @@ class JEPAPredictor(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=depth)
 
-        self.action_proj = nn.Linear(128, embed_dim)
+        self.action_proj = nn.Linear(action_dim, embed_dim)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -53,8 +61,14 @@ class JEPAPredictor(nn.Module):
         B, N, D = context_tokens.shape
         predictions = []
 
+        actions = action_context
+        if actions is not None:
+            if actions.dim() == 2:
+                actions = actions.unsqueeze(1).expand(-1, self.prediction_horizon, -1)
+
         for k in range(self.prediction_horizon):
-            pred = self.predict_single_step(context_tokens, k, action_context)
+            step_action = actions[:, k, :] if actions is not None else None
+            pred = self.predict_single_step(context_tokens, k, step_action)
             predictions.append(pred.unsqueeze(1))
 
         return torch.cat(predictions, dim=1)  # (B, K, N, D)

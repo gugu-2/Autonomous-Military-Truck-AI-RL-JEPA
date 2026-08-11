@@ -4,13 +4,18 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class PatchEmbedder(nn.Module):
     """Convolutional patch embedding."""
 
-    def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=512):
+    def __init__(
+        self, img_size=224, patch_size=16, in_channels: int = 3, in_chans: int = None, embed_dim=512
+    ):
         super().__init__()
+        if in_chans is not None:
+            in_channels = in_chans
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = (img_size // patch_size) * (img_size // patch_size)
@@ -18,10 +23,9 @@ class PatchEmbedder(nn.Module):
         self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
 
         # 2D Positional Embeddings
-        self.pos_embed = nn.Parameter(
-            self._get_sinusoid_encoding_table(self.num_patches, embed_dim)
+        self.register_buffer(
+            "pos_embed", self._get_sinusoid_encoding_table(self.num_patches, embed_dim)
         )
-        self.pos_embed.requires_grad = False
 
     def _get_sinusoid_encoding_table(self, n_position, d_hid):
         def get_position_angle_vec(position):
@@ -37,8 +41,19 @@ class PatchEmbedder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, H, W = x.shape
         x = self.proj(x)  # (B, embed_dim, H/patch_size, W/patch_size)
+        _, _, H_out, W_out = x.shape
+
+        pos_embed = self.pos_embed
+        if H_out * W_out != self.num_patches:
+            grid_size = int(self.num_patches**0.5)
+            pos_embed = pos_embed.reshape(1, grid_size, grid_size, -1).permute(0, 3, 1, 2)
+            pos_embed = F.interpolate(
+                pos_embed, size=(H_out, W_out), mode="bilinear", align_corners=False
+            )
+            pos_embed = pos_embed.flatten(2).transpose(1, 2)
+
         x = x.flatten(2).transpose(1, 2)  # (B, N, embed_dim)
-        x = x + self.pos_embed.to(x.device)
+        x = x + pos_embed
         return x
 
 

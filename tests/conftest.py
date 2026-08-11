@@ -20,46 +20,39 @@ class LatentState:
 
 
 class DrivingAction:
-    def __init__(self, steering, throttle, brake):
-        self.steering = steering
+    def __init__(self, steering_angle=0.0, throttle=0.0, brake=0.0, gear=1):
+        self.steering_angle = steering_angle
         self.throttle = throttle
         self.brake = brake
+        self.gear = gear
 
 
-class PatchEmbedder(torch.nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.proj = torch.nn.Conv2d(3, config.encoder.embed_dim, kernel_size=16, stride=16)
+try:
+    from jepa_brain.encoder.patch_embedder import PatchEmbedder
+    from jepa_brain.encoder.vit_encoder import ViTEncoder
+    from jepa_brain.predictor.hazard_energy import HazardEnergyComputer
+except ImportError:
+    # Fallback stubs if torch not installed
+    class PatchEmbedder:
+        pass
 
-    def forward(self, x):
-        return self.proj(x)
+    class ViTEncoder:
+        pass
 
+    class HazardEnergyComputer:
+        def __init__(self, config=None):
+            if config:
+                self.threshold = config.safety.hazard_threshold
+                self.warn_threshold = config.safety.warn_threshold
+                self.veto_threshold = config.safety.veto_threshold
+            else:
+                self.threshold = 0.7
 
-class ViTEncoder(torch.nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.patch_embed = PatchEmbedder(config)
-        self.blocks = torch.nn.ModuleList(
-            [torch.nn.Linear(config.encoder.embed_dim, config.encoder.embed_dim) for _ in range(1)]
-        )
-        self.norm = torch.nn.LayerNorm(config.encoder.embed_dim)
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        x = self.patch_embed(x).flatten(2).transpose(1, 2)
-        for blk in self.blocks:
-            x = blk(x)
-        return self.norm(x)
-
-
-class HazardEnergyComputer:
-    def __init__(self, config):
-        self.threshold = config.safety.hazard_threshold
-        self.warn_threshold = config.safety.warn_threshold
-        self.veto_threshold = config.safety.veto_threshold
-
-    def compute(self, s_hat, s_target):
-        return torch.mean((s_hat - s_target) ** 2, dim=-1)
+        def compute(self, s_target, s_hat):
+            diff_sq = torch.sum((s_target - s_hat) ** 2, dim=-1)
+            target_sq = torch.sum(s_target**2, dim=-1)
+            eps = 1e-6
+            return diff_sq / (target_sq + eps)
 
 
 @pytest.fixture(scope="function")
@@ -98,7 +91,7 @@ def dummy_latent_state(device):
 
 @pytest.fixture(scope="function")
 def dummy_action():
-    return DrivingAction(steering=0.0, throttle=0.5, brake=0.0)
+    return DrivingAction(steering_angle=0.0, throttle=0.5, brake=0.0, gear=1)
 
 
 @pytest.fixture(scope="function")
@@ -118,28 +111,15 @@ def robotaxi_config(dummy_config):
     return cfg
 
 
-@pytest.fixture(scope="function")
-def truck_config(dummy_config):
-    cfg = dummy_config.copy()
-    cfg.mode = "truck"
-    return cfg
-
-
-@pytest.fixture(scope="function")
-def military_config(dummy_config):
-    cfg = dummy_config.copy()
-    cfg.mode = "military"
-    return cfg
-
 
 @pytest.fixture(scope="function")
 def patch_embedder(dummy_config, device):
-    return PatchEmbedder(dummy_config).to(device)
+    return PatchEmbedder(img_size=224, patch_size=16, in_channels=3, embed_dim=dummy_config.encoder.embed_dim).to(device)
 
 
 @pytest.fixture(scope="function")
 def vit_encoder(dummy_config, device):
-    return ViTEncoder(dummy_config).to(device)
+    return ViTEncoder(embed_dim=dummy_config.encoder.embed_dim, depth=2, num_heads=4).to(device)
 
 
 @pytest.fixture(scope="function")

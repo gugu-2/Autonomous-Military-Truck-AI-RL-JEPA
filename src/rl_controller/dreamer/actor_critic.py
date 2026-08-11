@@ -21,7 +21,8 @@ def lambda_return(
     returns = torch.zeros_like(values)
     last_return = values[-1]
     for t in reversed(range(rewards.shape[0])):
-        ret = rewards[t] + gamma * ((1 - lambda_) * values[t] + lambda_ * last_return)
+        next_val = values[t + 1] if t + 1 < values.shape[0] else values[-1]
+        ret = rewards[t] + gamma * ((1 - lambda_) * next_val + lambda_ * last_return)
         returns[t] = ret
         last_return = ret
     return returns
@@ -50,7 +51,7 @@ class Actor(nn.Module):
         self.min_std = min_std
         self.net = MLP(feat_dim, action_dim * 2, hidden_sizes)
 
-    def forward(self, feat: torch.Tensor) -> tuple[torch.Tensor, dist.Distribution]:
+    def forward(self, feat: torch.Tensor) -> dist.Distribution:
         out = self.net(feat)
         mean, std = torch.chunk(out, 2, dim=-1)
         mean = torch.tanh(mean)  # Squashed mean
@@ -59,14 +60,12 @@ class Actor(nn.Module):
         # Normal distribution wrapped in independent (diagonal)
         base_dist = dist.Normal(mean, std)
         distribution = dist.Independent(base_dist, 1)
-        action = distribution.rsample()  # Reparameterization trick
-
-        # Squash action to [-1, 1] - usually TanhTransform is used but keeping it simple with direct tanh
-        squashed_action = torch.tanh(action)
-        return squashed_action, distribution
+        # Store squashed mean for deterministic action selection
+        distribution._squashed_mean = mean
+        return distribution
 
     def log_prob(self, feat: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        _, distribution = self.forward(feat)
+        distribution = self.forward(feat)
         # Inverse tanh trick for exact log prob of squashed action
         raw_action = torch.atanh(torch.clamp(action, -0.999999, 0.999999))
         log_prob = distribution.log_prob(raw_action)
@@ -88,27 +87,22 @@ class Critic(nn.Module):
 
     def expected_value(self, logits: torch.Tensor) -> torch.Tensor:
         probs = F.softmax(logits, dim=-1)
-        expected_symlog = torch.sum(probs * self.bins, dim=-1)
-        return symexp(expected_symlog)
+        return (probs * self.bins.to(logits.device)).sum(dim=-1, keepdim=True)
 
-    def two_hot_loss(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        """Cross-entropy loss on two-hot encoded target."""
-        target = torch.clamp(target, self.lower, self.upper)
-
-        # Compute two-hot targets
-        diffs = torch.abs(self.bins.unsqueeze(0) - target.unsqueeze(1))
-        # Find closest bins
-        idx = torch.argmin(diffs, dim=-1)
-
-        two_hot = torch.zeros_like(logits)
-        for i in range(target.shape[0]):
-            b = target[i]
-            # Simple soft assignment for continuous target mapping to discrete bins
-            for j in range(self.num_bins - 1):
-                if self.bins[j] <= b <= self.bins[j + 1]:
-                    w = (b - self.bins[j]) / (self.bins[j + 1] - self.bins[j])
-                    two_hot[i, j] = 1.0 - w
-                    two_hot[i, j + 1] = w
-                    break
-
-        return F.cross_entropy(logits, two_hot)
+    def two_hot_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # Vectorized two-hot encoding
+        bins = self.bins.to(targets.device)
+        below = (torch.bucketize(targets, bins) - 1).clamp(0, len(bins) - 2)
+        above = below + 1
+        lower = bins[below]
+        upper = bins[above]
+        # Linear interpolation weights
+        upper_weight = ((targets - lower) / (upper - lower + 1e-8)).clamp(0, 1)
+        lower_weight = 1.0 - upper_weight
+        # Build two-hot target
+        two_hot = torch.zeros(*targets.shape, len(bins), device=targets.device)
+        two_hot.scatter_(-1, below.unsqueeze(-1), lower_weight.unsqueeze(-1))
+        two_hot.scatter_(-1, above.unsqueeze(-1), upper_weight.unsqueeze(-1))
+        # Cross-entropy loss
+        log_probs = F.log_softmax(logits, dim=-1)
+        return -(two_hot * log_probs).sum(dim=-1).mean()

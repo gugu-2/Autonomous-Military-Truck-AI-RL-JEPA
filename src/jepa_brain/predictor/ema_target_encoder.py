@@ -11,7 +11,7 @@ class EMATargetEncoder(nn.Module):
         super().__init__()
         self.momentum = momentum
         self.target_encoder = copy.deepcopy(online_encoder)
-        self.online_encoder = online_encoder
+        object.__setattr__(self, "_online_encoder_ref", online_encoder)
 
         # Stop gradients for the target encoder
         for param in self.target_encoder.parameters():
@@ -24,11 +24,15 @@ class EMATargetEncoder(nn.Module):
         """
         with torch.no_grad():
             for online_param, target_param in zip(
-                self.online_encoder.parameters(), self.target_encoder.parameters()
+                self._online_encoder_ref.parameters(), self.target_encoder.parameters()
             ):
                 target_param.data.mul_(self.momentum).add_(
                     online_param.data, alpha=1.0 - self.momentum
                 )
+            for (name, target_buf), (_, online_buf) in zip(
+                self.target_encoder.named_buffers(), self._online_encoder_ref.named_buffers()
+            ):
+                target_buf.data.mul_(self.momentum).add_(online_buf.data * (1 - self.momentum))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through target encoder (with torch.no_grad())."""

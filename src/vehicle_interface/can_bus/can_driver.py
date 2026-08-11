@@ -31,6 +31,7 @@ class CANDriver:
         self.callbacks: dict[int, Callable[[can.Message], None]] = {}
 
         self._running = False
+        self._recovering = False
         self._rx_thread: threading.Thread | None = None
 
         # Statistics
@@ -64,6 +65,7 @@ class CANDriver:
     def stop(self):
         """Cleanly stops the CAN driver and closes the bus."""
         self._running = False
+        self._recovering = False
         if self._rx_thread and self._rx_thread.is_alive():
             self._rx_thread.join(timeout=2.0)
 
@@ -135,20 +137,30 @@ class CANDriver:
                 logger.error(f"Unexpected error in CAN receive loop: {e}")
 
     def _handle_bus_error(self):
-        """Attempt bus-off recovery with exponential backoff."""
-        logger.warning("Attempting bus recovery...")
-        if self.bus:
-            self.bus.shutdown()
+        if getattr(self, "_recovering", False):
+            return
+        import threading
 
-        backoff = 1.0
-        max_backoff = 16.0
+        threading.Thread(target=self._do_recovery, daemon=True).start()
 
-        while self._running:
-            try:
-                time.sleep(backoff)
-                self._init_bus()
-                logger.info("Bus successfully recovered.")
-                break
-            except Exception as e:
-                logger.error(f"Bus recovery failed: {e}. Retrying in {backoff}s...")
-                backoff = min(backoff * 2, max_backoff)
+    def _do_recovery(self):
+        self._recovering = True
+        try:
+            logger.warning("Attempting bus recovery...")
+            if self.bus:
+                self.bus.shutdown()
+
+            backoff = 1.0
+            max_backoff = 16.0
+
+            while self._running:
+                try:
+                    time.sleep(backoff)
+                    self._init_bus()
+                    logger.info("Bus successfully recovered.")
+                    break
+                except Exception as e:
+                    logger.error(f"Bus recovery failed: {e}. Retrying in {backoff}s...")
+                    backoff = min(backoff * 2, max_backoff)
+        finally:
+            self._recovering = False

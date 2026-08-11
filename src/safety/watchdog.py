@@ -55,13 +55,15 @@ class Watchdog:
         with self._lock:
             self._running = False
         if self._thread:
-            self._thread.join()
+            if threading.current_thread() is not self._thread:
+                self._thread.join(timeout=2.0)
             self.logger.info("Watchdog stopped.")
 
     def _monitor_loop(self):
         while self._running:
             time.sleep(0.05)  # Check every 50ms
             now = time.time()
+            callbacks_to_fire = []
             with self._lock:
                 for name, status in self._status.items():
                     if not status.is_healthy:
@@ -78,10 +80,13 @@ class Watchdog:
                             status.is_healthy = False
                             self.logger.critical(f"CRITICAL: Module {name} failed watchdog check!")
                             callback = self._modules[name]["callback"]
-                            try:
-                                callback(name)
-                            except Exception as e:
-                                self.logger.error(f"Error in watchdog callback for {name}: {e}")
+                            callbacks_to_fire.append((callback, name))
+
+            for cb, nm in callbacks_to_fire:
+                try:
+                    cb(nm)
+                except Exception as e:
+                    self.logger.error(f"Error in watchdog callback for {nm}: {e}")
 
     def get_status(self) -> dict[str, ModuleStatus]:
         with self._lock:

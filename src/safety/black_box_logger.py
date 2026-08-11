@@ -9,6 +9,20 @@ import threading
 import time
 from pathlib import Path
 
+import numpy as np
+
+
+class _SafeJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "tolist"):
+            return obj.tolist()
+        if hasattr(obj, "item"):
+            return obj.item()
+        if isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        return str(obj)
+
+
 try:
     from cryptography.fernet import Fernet
 
@@ -58,7 +72,9 @@ class BlackBoxLogger:
             "jepa": jepa_latent_summary,
             "action": (
                 {
-                    "steer": rl_action.steering,
+                    "steer": getattr(
+                        rl_action, "steering_angle", getattr(rl_action, "steering", 0.0)
+                    ),
                     "throttle": rl_action.throttle,
                     "brake": rl_action.brake,
                 }
@@ -93,7 +109,7 @@ class BlackBoxLogger:
             }
 
         try:
-            json_str = json.dumps(dump_data)
+            json_str = json.dumps(dump_data, cls=_SafeJSONEncoder)
             out_path = self._get_output_path(reason)
 
             if self.use_encryption:

@@ -30,7 +30,7 @@ class DrivingPolicy:
 
     def reset(self):
         """Reset the internal recurrent state of the policy."""
-        self.prev_state = self.agent.rssm.initial(1)
+        self.prev_state = self.agent.rssm.initial(1, self.device)
         self.prev_action = torch.zeros(1, self.agent.action_dim, device=self.device)
 
     @torch.no_grad()
@@ -70,7 +70,7 @@ class DrivingPolicy:
             max_hazard = float(hazard_map.max())
             if max_hazard > 0.70:
                 decoded_action = self.safety.trigger_emergency_brake(
-                    decoded_action, reason=f"Hazard E={max_hazard:.2f}"
+                    reason=f"Hazard E={max_hazard:.2f}"
                 )
             elif max_hazard > 0.45:
                 decoded_action = self.safety.apply_caution_limits(decoded_action)

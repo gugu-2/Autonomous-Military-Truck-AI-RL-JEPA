@@ -3,6 +3,10 @@
 import torch
 import torch.nn as nn
 
+from jepa_brain.encoder.patch_embedder import PatchEmbedder
+
+__all__ = ["PatchEmbedder", "MultiHeadSelfAttention", "TransformerBlock", "ViTEncoder"]
+
 
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, dropout=0.0):
@@ -15,7 +19,6 @@ class MultiHeadSelfAttention(nn.Module):
         self.qkv = nn.Linear(embed_dim, embed_dim * 3, bias=False)
         self.proj = nn.Linear(embed_dim, embed_dim)
         self.dropout = dropout
-        self.attn_drop = nn.Dropout(dropout)
         self.proj_drop = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -69,7 +72,7 @@ class ViTEncoder(nn.Module):
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             nn.init.trunc_normal_(m.weight, std=0.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
+            if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)

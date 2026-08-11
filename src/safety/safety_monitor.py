@@ -18,7 +18,7 @@ class SystemSafetyState(Enum):
 
 @dataclass
 class DrivingAction:
-    steering: float
+    steering_angle: float
     throttle: float
     brake: float
 
@@ -52,14 +52,16 @@ class SafetyMonitor:
         self, action: DrivingAction, prev_action: DrivingAction, dt: float
     ) -> SafetyFlag:
         if (
-            action.steering > 1.0
-            or action.steering < -1.0
+            action.steering_angle > 1.0
+            or action.steering_angle < -1.0
             or action.throttle > 1.0
+            or action.throttle < 0.0
             or action.brake > 1.0
+            or action.brake < 0.0
         ):
             return SafetyFlag.FAILSAFE
         # Simple rate limit check
-        if dt > 0 and abs(action.steering - prev_action.steering) / dt > 5.0:
+        if dt > 0 and abs(action.steering_angle - prev_action.steering_angle) / dt > 5.0:
             return SafetyFlag.WARN
         return SafetyFlag.NOMINAL
 
@@ -84,11 +86,13 @@ class SafetyMonitor:
         action: DrivingAction,
         prev_action: DrivingAction,
         sensor_health: SensorHealthStatus,
+        last_can_ms: float = 0.0,
     ) -> SafetyFlag:
         flags = [
             self.check_jepa_health(jepa_latency, hazard_energy),
             self.check_rl_output(action, prev_action, 0.05),  # assuming 20Hz dt
             self.check_sensor_health(sensor_health),
+            self.check_can_heartbeat(last_can_ms),
         ]
 
         worst_flag = max(flags, key=lambda f: f.value)

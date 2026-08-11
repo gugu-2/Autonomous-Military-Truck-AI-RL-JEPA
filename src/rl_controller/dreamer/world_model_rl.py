@@ -53,5 +53,5 @@ class WorldModelRLWrapper(nn.Module):
         Full forward pass: Encode observation -> Update RSSM state.
         """
         embed = self.encode_observation(obs)
-        prior, post = self.rssm.obs_step(prev_state, prev_action, embed)
+        post, prior = self.rssm.obs_step(embed, prev_action, prev_state)
         return embed, post

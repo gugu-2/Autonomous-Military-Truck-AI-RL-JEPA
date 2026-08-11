@@ -1,6 +1,8 @@
 """Decodes vehicle feedback from CAN bus into Python structures."""
 
+import dataclasses
 import struct
+import threading
 import time
 from dataclasses import dataclass
 
@@ -24,6 +26,7 @@ class CANDecoder:
 
     def __init__(self):
         self._status = VehicleStatus()
+        self._lock = threading.Lock()
 
     def decode_speed(self, msg: can.Message) -> float:
         """
@@ -35,9 +38,11 @@ class CANDecoder:
             fl, fr, rl, rr = struct.unpack("<HHHH", msg.data[:8])
             # Average wheel speed
             speed = ((fl + fr + rl + rr) / 4.0) * 0.01
-            self._status.speed_ms = speed
+            with self._lock:
+                self._status.speed_ms = speed
             return speed
-        return self._status.speed_ms
+        with self._lock:
+            return self._status.speed_ms
 
     def decode_steering_feedback(self, msg: can.Message) -> float:
         """
@@ -48,9 +53,11 @@ class CANDecoder:
         if len(msg.data) >= 2:
             raw_angle = struct.unpack("<h", msg.data[:2])[0]
             angle = raw_angle * 0.1
-            self._status.steering_angle_deg = angle
+            with self._lock:
+                self._status.steering_angle_deg = angle
             return angle
-        return self._status.steering_angle_deg
+        with self._lock:
+            return self._status.steering_angle_deg
 
     def decode_engine_status(self, msg: can.Message) -> dict:
         """
@@ -60,9 +67,10 @@ class CANDecoder:
         """
         if len(msg.data) >= 4:
             rpm, gear, faults = struct.unpack("<HBB", msg.data[:4])
-            self._status.engine_rpm = float(rpm)
-            self._status.gear = gear
-            self._status.fault_code = faults
+            with self._lock:
+                self._status.engine_rpm = float(rpm)
+                self._status.gear = gear
+                self._status.fault_code = faults
             return {"rpm": rpm, "gear": gear, "faults": faults}
         return {}
 
@@ -75,13 +83,15 @@ class CANDecoder:
         if len(msg.data) >= 2:
             pressure_raw = struct.unpack("<H", msg.data[:2])[0]
             pressure = pressure_raw * 0.1
-            self._status.brake_pressure = pressure
+            with self._lock:
+                self._status.brake_pressure = pressure
             return {"brake_pressure": pressure}
         return {}
 
     def decode_message(self, msg: can.Message) -> dict | None:
         """Routes a CAN message to the correct decoder."""
-        self._status.timestamp = time.time()
+        with self._lock:
+            self._status.timestamp = time.time()
 
         if msg.arbitration_id == 0x200:
             return {"speed_ms": self.decode_speed(msg)}
@@ -95,4 +105,5 @@ class CANDecoder:
 
     def get_vehicle_status(self) -> VehicleStatus:
         """Returns the latest fused vehicle status."""
-        return self._status
+        with self._lock:
+            return dataclasses.replace(self._status)

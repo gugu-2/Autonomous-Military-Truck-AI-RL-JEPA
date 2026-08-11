@@ -1,9 +1,12 @@
 """Failsafe controller — graceful controlled stop on system failure."""
 
 import logging
+import struct
 import threading
 import time
 from enum import Enum, auto
+
+from vehicle_interface.can_bus.can_encoder import CANCommandEncoder, DrivingAction
 
 
 class FailsafeState(Enum):
@@ -22,8 +25,10 @@ class SafetyFlag(Enum):
 class FailsafeController:
     """Manages graceful degraded operations and emergency stops."""
 
-    def __init__(self, vehicle_interface, config):
-        self.vehicle_interface = vehicle_interface
+    def __init__(self, can_driver, can_decoder, config):
+        self.can_driver = can_driver
+        self.can_decoder = can_decoder
+        self.can_encoder = CANCommandEncoder()
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.state = FailsafeState.NOMINAL
@@ -47,8 +52,9 @@ class FailsafeController:
     def trigger_emergency_stop(self, reason: str):
         self.logger.critical(f"EMERGENCY STOP Triggered: {reason}")
         try:
-            self.vehicle_interface.apply_max_brake()
-            self.vehicle_interface.disable_drive_power()
+            action1 = DrivingAction(steering_angle=0.0, throttle=0.0, brake=1.0, gear=0)
+            for msg in self.can_encoder.encode_action(action1):
+                self.can_driver.send(msg.arbitration_id, msg.data, msg.is_extended_id)
             self.state = FailsafeState.STOPPED
         except Exception as e:
             self.logger.error(f"Failed to apply emergency stop: {e}")
@@ -63,16 +69,22 @@ class FailsafeController:
     def _decel_loop(self, target_decel: float):
         try:
             while True:
-                current_speed = self.vehicle_interface.get_current_speed()
+                current_speed = self.can_decoder.get_vehicle_status().speed_ms
                 if self.is_stopped(current_speed):
                     self.logger.info("Vehicle has fully stopped.")
                     with self._lock:
                         self.state = FailsafeState.STOPPED
-                    self.vehicle_interface.apply_parking_brake()
+                    action = DrivingAction(steering_angle=0.0, throttle=0.0, brake=1.0, gear=0)
+                    for msg in self.can_encoder.encode_action(action):
+                        self.can_driver.send(msg.arbitration_id, msg.data, msg.is_extended_id)
                     break
 
                 # Apply brake corresponding to target deceleration
-                self.vehicle_interface.apply_brake_for_deceleration(target_decel)
+                brake_val = min(1.0, max(0.0, abs(target_decel) / 10.0))
+                action = DrivingAction(steering_angle=0.0, throttle=0.0, brake=brake_val, gear=3)
+                for msg in self.can_encoder.encode_action(action):
+                    if msg.arbitration_id == 0x102:
+                        self.can_driver.send(msg.arbitration_id, msg.data, msg.is_extended_id)
                 time.sleep(0.05)
         except Exception as e:
             self.logger.error(f"Error in controlled deceleration loop: {e}")
@@ -80,15 +92,19 @@ class FailsafeController:
 
     def activate_hazard_lights(self):
         try:
-            self.vehicle_interface.send_can_message(0x350, [0x01])
+            self.can_driver.send(0x350, bytes([0x01]), False)
             self.logger.info("Hazard lights activated.")
         except Exception as e:
             self.logger.error(f"Failed to activate hazard lights: {e}")
 
     def broadcast_sos(self, reason: str):
         self.logger.info(f"Broadcasting SOS to fleet API: {reason}")
-        # In a real implementation, this would make an HTTP/gRPC request to fleet management
-        pass
+        try:
+            current_speed = self.can_decoder.get_vehicle_status().speed_ms
+            payload = b"SOS\x00" + struct.pack("<f", current_speed)
+            self.can_driver.send(0x7DF, payload, False)
+        except Exception as e:
+            self.logger.error(f"Failed to broadcast SOS: {e}")
 
     def is_stopped(self, current_speed_ms: float) -> bool:
         return abs(current_speed_ms) < 0.1

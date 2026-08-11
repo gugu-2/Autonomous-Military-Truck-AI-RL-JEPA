@@ -105,10 +105,28 @@ class RSSM(nn.Module):
         stoch = stoch + dist.probs - dist.probs.detach()  # Straight-through gradient
         return stoch
 
-    def get_feat(self, state: RSSMState) -> torch.Tensor:
+    def get_feat(self, state_or_stoch, deter=None) -> torch.Tensor:
         """Concatenates deterministic and stochastic states for actor/critic."""
+        if deter is not None:  # called as get_feat(stoch, deter)
+            stoch = state_or_stoch
+            flat_stoch = stoch.reshape(stoch.shape[0], -1)
+            return torch.cat([deter, flat_stoch], dim=-1)
+        # called as get_feat(RSSMState)
+        state = state_or_stoch
         flat_stoch = state.stoch.reshape(state.stoch.shape[0], -1)
         return torch.cat([state.deter, flat_stoch], dim=-1)
+
+    def initial(self, batch_size: int, device: torch.device) -> RSSMState:
+        """Alias for initial_state()."""
+        return self.initial_state(batch_size, device)
+
+    def obs_step(self, embed: torch.Tensor, action: torch.Tensor, state: RSSMState):
+        """Alias for observe()."""
+        return self.observe(embed, action, state)
+
+    def img_step(self, action: torch.Tensor, state: RSSMState) -> RSSMState:
+        """Alias for imagine()."""
+        return self.imagine(action, state)
 
     def kl_loss(
         self, post_logits: torch.Tensor, prior_logits: torch.Tensor, free_nats: float = 3.0

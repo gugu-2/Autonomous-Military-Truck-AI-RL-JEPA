@@ -36,19 +36,16 @@ class ImaginationTrainer:
         """
         Compute Lambda-returns for Actor-Critic training.
         """
-        returns = torch.zeros_like(values)
         last_val = values[:, -1]
-
+        returns = []
         for t in reversed(range(self.horizon)):
+            next_val = values[:, t + 1] if t + 1 < self.horizon else last_val
             ret = rewards[:, t] + self.gamma * continues[:, t] * (
-                (1 - self.lmbda) * values[:, t + 1]
-                if t + 1 < self.horizon
-                else 0.0 + self.lmbda * last_val
+                (1 - self.lmbda) * next_val + self.lmbda * last_val
             )
-            returns[:, t] = ret
             last_val = ret
-
-        return returns
+            returns.insert(0, ret)
+        return torch.stack(returns, dim=1)
 
     def train_step(
         self,
@@ -87,7 +84,7 @@ class ImaginationTrainer:
         # and roll out the policy in the world model for `self.horizon` steps.
 
         # Get start states from flattened posterior (mocking with zeros)
-        start_state = self.agent.rssm.initial(batch_size * seq_len)
+        start_state = self.agent.rssm.initial(batch_size * seq_len, device)
 
         with torch.cuda.amp.autocast(enabled=self.config.get("use_amp", True)):
             # Rollout in imagination
@@ -107,8 +104,9 @@ class ImaginationTrainer:
             actor_loss = -returns.mean()
             metrics["actor_loss"] = actor_loss.item()
 
-            # Critic loss (Minimize MSE to returns)
-            critic_loss = torch.nn.functional.mse_loss(imag_values, returns.detach())
+            # Critic loss (Minimize cross-entropy to two-hot targets)
+            critic_logits = self.agent.critic(imag_features)
+            critic_loss = self.agent.critic.two_hot_loss(critic_logits, returns.detach())
             metrics["critic_loss"] = critic_loss.item()
 
         # Update Actor
