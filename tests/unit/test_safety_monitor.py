@@ -1,70 +1,25 @@
-"""Unit tests for safety monitor."""
+"""Unit tests for Safety Interlocks."""
+
+import time
+
+from safety.safety_monitor import SafetyMonitor
 
 
-class SafetyFlag:
-    NOMINAL = 0
-    WARN = 1
-    DEGRADED = 2
-    FAILSAFE = 3
+def test_watchdog_timeout():
+    """Test that the watchdog triggers emergency brake on latency spikes."""
+    monitor = SafetyMonitor(max_latency_ms=12)  # 12ms AI budget
 
+    # Simulate fast inference (5ms)
+    start = time.time()
+    time.sleep(0.005)
+    is_safe = monitor.check_latency(start, time.time())
+    assert is_safe is True, "5ms inference should be safe"
 
-class SafetyMonitor:
-    def __init__(self):
-        self.consecutive_warns = 0
+    # Simulate GPU spike / freeze (20ms)
+    start = time.time()
+    time.sleep(0.020)
+    is_safe = monitor.check_latency(start, time.time())
+    assert is_safe is False, "20ms inference should trigger watchdog"
 
-    def check(self, jepa_latency_ms=10, hazard_energy=0.1, steering_rate=0.0, sensors_ok=True):
-        if not sensors_ok:
-            return SafetyFlag.FAILSAFE
-
-        if hazard_energy >= 0.85:
-            return SafetyFlag.FAILSAFE
-
-        flag = SafetyFlag.NOMINAL
-
-        if jepa_latency_ms > 20:
-            flag = SafetyFlag.WARN
-
-        if abs(steering_rate) > 300:
-            flag = SafetyFlag.WARN
-
-        if flag == SafetyFlag.WARN:
-            self.consecutive_warns += 1
-            if self.consecutive_warns >= 3:
-                return SafetyFlag.DEGRADED
-            return SafetyFlag.WARN
-        else:
-            self.consecutive_warns = 0
-
-        return flag
-
-
-def test_nominal_state_returns_nominal():
-    monitor = SafetyMonitor()
-    assert monitor.check() == SafetyFlag.NOMINAL
-
-
-def test_high_jepa_latency_triggers_warn():
-    monitor = SafetyMonitor()
-    assert monitor.check(jepa_latency_ms=25) == SafetyFlag.WARN
-
-
-def test_critical_hazard_energy_triggers_failsafe():
-    monitor = SafetyMonitor()
-    assert monitor.check(hazard_energy=0.90) == SafetyFlag.FAILSAFE
-
-
-def test_excessive_steering_rate_triggers_warn():
-    monitor = SafetyMonitor()
-    assert monitor.check(steering_rate=350) == SafetyFlag.WARN
-
-
-def test_sensor_all_failed_triggers_failsafe():
-    monitor = SafetyMonitor()
-    assert monitor.check(sensors_ok=False) == SafetyFlag.FAILSAFE
-
-
-def test_three_consecutive_warns_escalate():
-    monitor = SafetyMonitor()
-    assert monitor.check(jepa_latency_ms=25) == SafetyFlag.WARN
-    assert monitor.check(jepa_latency_ms=25) == SafetyFlag.WARN
-    assert monitor.check(jepa_latency_ms=25) == SafetyFlag.DEGRADED
+    # Assert emergency brake is requested via interlock
+    assert monitor.is_emergency_brake_triggered() is True

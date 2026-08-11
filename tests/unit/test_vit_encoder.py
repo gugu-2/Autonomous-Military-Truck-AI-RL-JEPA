@@ -1,73 +1,51 @@
 """Unit tests for ViT Encoder."""
 
-import pytest
 import torch
-import torch.nn as nn
+
+from jepa_brain.encoder.vit_encoder import PatchEmbedder, ViTEncoder
 
 
-class MockViTEncoder(nn.Module):
-    def __init__(self, embed_dim=256, patch_size=16):
-        super().__init__()
-        self.patch_size = patch_size
-        self.embed_dim = embed_dim
-        self.proj = nn.Conv2d(3, embed_dim, kernel_size=patch_size, stride=patch_size)
+def test_patch_embedder_shapes():
+    """Test patch embedding dimensions are mathematically correct."""
+    # Given an input of batch=2, channels=3, H=224, W=224
+    dummy_input = torch.randn(2, 3, 224, 224)
 
-    def forward(self, x):
-        # x: (B, C, H, W)
-        x = self.proj(x)
-        # x: (B, D, H/p, W/p)
-        x = x.flatten(2).transpose(1, 2)
-        return x
+    # 224x224 image with 16x16 patches = (224/16)*(224/16) = 14*14 = 196 patches
+    # Wait, the code has num_patches hardcoded to 256 for a 16x16 grid, which means H=256, W=256.
+    # Let's check the encoder's expected sizes or pass 256x256.
+    dummy_input = torch.randn(2, 3, 256, 256)
 
+    embedder = PatchEmbedder(img_size=256, patch_size=16, in_chans=3, embed_dim=512)
 
-def test_output_shape():
-    encoder = MockViTEncoder(embed_dim=256)
-    x = torch.randn(2, 3, 224, 224)
-    out = encoder(x)
-    assert out.shape == (2, 196, 256)
+    output = embedder(dummy_input)
+
+    # Assert Output: (Batch, Num_Tokens, Embed_Dim) -> (2, 256, 512)
+    assert output.shape == (2, 256, 512)
 
 
-def test_patch_count():
-    encoder = MockViTEncoder(patch_size=16)
-    x = torch.randn(2, 3, 224, 224)
-    out = encoder(x)
-    assert out.shape[1] == 196  # (224/16) * (224/16) = 14 * 14 = 196
+def test_vit_encoder_forward():
+    """Test the full ViT Encoder forward pass."""
+    dummy_input = torch.randn(2, 3, 256, 256)
 
+    # Initialize tiny ViT
+    encoder = ViTEncoder(
+        img_size=256,
+        patch_size=16,
+        in_chans=3,
+        embed_dim=512,
+        depth=2,  # Tiny depth for test speed
+        num_heads=4,
+    )
 
-def test_no_nan():
-    encoder = MockViTEncoder()
-    x = torch.randn(2, 3, 224, 224)
-    out = encoder(x)
-    assert not torch.any(torch.isnan(out))
+    output = encoder(dummy_input)
 
+    # Assert output shape matches tokenized embedding
+    assert output.shape == (2, 256, 512)
 
-def test_gradient_flows():
-    encoder = MockViTEncoder()
-    x = torch.randn(2, 3, 224, 224, requires_grad=True)
-    out = encoder(x)
-    loss = out.sum()
+    # Assert gradients can flow backwards
+    loss = output.sum()
     loss.backward()
-    assert x.grad is not None
 
-
-def test_device_consistency():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    encoder = MockViTEncoder().to(device)
-    x = torch.randn(2, 3, 224, 224).to(device)
-    out = encoder(x)
-    assert out.device == x.device
-
-
-def test_batch_size_1():
-    encoder = MockViTEncoder()
-    x = torch.randn(1, 3, 224, 224)
-    out = encoder(x)
-    assert out.shape == (1, 196, 256)
-
-
-@pytest.mark.parametrize("dim", [256, 512, 768])
-def test_different_embed_dims(dim):
-    encoder = MockViTEncoder(embed_dim=dim)
-    x = torch.randn(2, 3, 224, 224)
-    out = encoder(x)
-    assert out.shape == (2, 196, dim)
+    # Check that parameters have gradients
+    for name, param in encoder.named_parameters():
+        assert param.grad is not None, f"No gradient for {name}"

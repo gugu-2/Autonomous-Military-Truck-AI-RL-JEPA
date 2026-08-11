@@ -1,92 +1,33 @@
-"""CAN encoder tests."""
+"""Unit tests for CAN Bitwise Encoding and Decoding."""
 
-import struct
-
-import pytest
+from vehicle_interface.can_bus.can_encoder import CANEncoder
 
 
-class CANEncoder:
-    def encode_steering(self, deg):
-        # Range -45 to 45 deg maps to 0-65535 (uint16)
-        clamped = max(-45.0, min(45.0, deg))
-        val = int((clamped + 45.0) / 90.0 * 65535.0)
-        return struct.pack("<H", val)
+def test_can_steering_throttle_encoding():
+    """Test that float actions map to exact bits in the CAN payload."""
+    encoder = CANEncoder()
 
-    def decode_steering(self, data):
-        val = struct.unpack("<H", data)[0]
-        return (val / 65535.0) * 90.0 - 45.0
+    # 0.0 steering, 0.0 throttle, 0.0 brake
+    # Based on DBC specs (e.g., standard mapping for DbW)
+    # Typically, offset by 0x7FFF for 0.0 in a 16-bit field
 
-    def encode_throttle(self, val):
-        # 0.0 to 1.0 -> 0-255 (uint8)
-        clamped = max(0.0, min(1.0, val))
-        return bytes([int(clamped * 255.0)])
+    # Note: the mock CANEncoder inside can_encoder.py uses struct packing:
+    # return struct.pack("<hhB", int(steering * 32767), int(throttle * 255), int(brake * 255))
 
-    def decode_throttle(self, data):
-        return data[0] / 255.0
+    steering = 1.0  # Max right
+    throttle = 0.5  # 50%
+    brake = 0.0
 
-    def encode_brake(self, val):
-        clamped = max(0.0, min(1.0, val))
-        return bytes([int(clamped * 255.0)])
+    payload = encoder.encode_control(steering, throttle, brake)
 
-    def encode_action(self, steering, throttle, brake):
-        return [
-            {"id": 0x100, "data": self.encode_steering(steering)},
-            {"id": 0x101, "data": self.encode_throttle(throttle)},
-            {"id": 0x102, "data": self.encode_brake(brake)},
-        ]
+    assert len(payload) == 8, "CAN payload must be strictly 8 bytes"
 
+    # Max steering * 32767 = 32767 (0x7FFF) -> little endian (FF 7F)
+    assert payload[0] == 0xFF
+    assert payload[1] == 0x7F
 
-@pytest.fixture
-def encoder():
-    return CANEncoder()
+    # Throttle 0.5 * 255 = 127 (0x7F)
+    assert payload[2] == 0x7F
 
-
-def test_steering_center_encodes_correctly(encoder):
-    data = encoder.encode_steering(0.0)
-    # Midpoint of 65535 is 32767 = 0x7FFF
-    assert data == struct.pack("<H", 32767)
-
-
-def test_steering_max_positive(encoder):
-    data = encoder.encode_steering(45.0)
-    assert data == struct.pack("<H", 65535)
-
-
-def test_steering_max_negative(encoder):
-    data = encoder.encode_steering(-45.0)
-    assert data == struct.pack("<H", 0)
-
-
-def test_throttle_zero(encoder):
-    data = encoder.encode_throttle(0.0)
-    assert data == b"\x00"
-
-
-def test_throttle_full(encoder):
-    data = encoder.encode_throttle(1.0)
-    assert data == b"\xff"
-
-
-def test_brake_encoding(encoder):
-    data = encoder.encode_brake(1.0)
-    assert data == b"\xff"
-
-
-def test_round_trip_steering(encoder):
-    original = 12.34
-    data = encoder.encode_steering(original)
-    decoded = encoder.decode_steering(data)
-    assert abs(original - decoded) < 0.01
-
-
-def test_round_trip_throttle(encoder):
-    original = 0.56
-    data = encoder.encode_throttle(original)
-    decoded = encoder.decode_throttle(data)
-    assert abs(original - decoded) < 0.004
-
-
-def test_action_produces_correct_frame_ids(encoder):
-    frames = encoder.encode_action(0.0, 0.5, 0.0)
-    ids = [f["id"] for f in frames]
-    assert ids == [0x100, 0x101, 0x102]
+    # Brake 0.0 = 0
+    assert payload[4] == 0x00

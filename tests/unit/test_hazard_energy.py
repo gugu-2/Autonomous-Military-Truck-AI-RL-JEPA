@@ -1,108 +1,34 @@
-"""Unit tests for JEPA Hazard Energy computation."""
+"""Unit tests for Hazard Energy Computation."""
 
-import pytest
 import torch
+from jepa_brain.predictor.trajectory_veto import TrajectoryVeto
 
 
-class HazardLevel:
-    CLEAR = 0
-    WARN = 1
-    CRITICAL = 2
+def test_hazard_energy_calculation():
+    """Test the L2 Norm mathematical formula for Hazard Energy."""
+    veto_system = TrajectoryVeto(threshold=0.7)
 
+    # s_target is the true world state (EMA encoded)
+    # s_hat is the predicted world state
+    # Energy E(t+k) = ||s_target - s_hat||^2 / ||s_target||^2
 
-class MockHazardEnergyComputer:
-    def __init__(self):
-        self.warn_threshold = 0.5
-        self.veto_threshold = 0.70
-        self.emergency_brake_threshold = 0.85
+    # Create deterministic tensors for math verification
+    s_target = torch.ones(2, 256, 512) * 2.0  # L2 norm per element is 2.0
+    s_hat_safe = torch.ones(2, 256, 512) * 2.0  # Perfect match
 
-    def compute(self, s_hat, s_target):
-        return torch.mean((s_hat - s_target) ** 2, dim=-1)
+    # 1. Perfect Prediction = 0 Energy (Safe)
+    energy_safe, is_veto_safe = veto_system.evaluate_hazard(s_target, s_hat_safe)
+    assert torch.allclose(energy_safe, torch.tensor(0.0)), "Perfect match must yield 0.0 energy"
+    assert is_veto_safe is False
 
-    def get_spatial_map(self, energy, h=16, w=16):
-        return energy.view(-1, h, w)
+    # 2. Complete Mismatch = High Energy (Danger)
+    s_hat_danger = torch.ones(2, 256, 512) * 4.0  # Double the value
+    # ||2 - 4||^2 = 4
+    # ||2||^2 = 4
+    # Energy = 4 / 4 = 1.0 (100% mismatch)
+    energy_danger, is_veto_danger = veto_system.evaluate_hazard(s_target, s_hat_danger)
 
-    def get_hazard_level(self, max_energy):
-        if max_energy >= self.veto_threshold:
-            return HazardLevel.CRITICAL
-        elif max_energy >= self.warn_threshold:
-            return HazardLevel.WARN
-        return HazardLevel.CLEAR
-
-    def should_veto(self, max_energy):
-        return max_energy >= self.veto_threshold
-
-    def should_emergency_brake(self, max_energy):
-        return max_energy >= self.emergency_brake_threshold
-
-
-@pytest.fixture
-def computer():
-    return MockHazardEnergyComputer()
-
-
-def test_energy_zero_when_perfect_prediction(computer):
-    s_hat = torch.ones((2, 256, 512))
-    s_target = torch.ones((2, 256, 512))
-    energy = computer.compute(s_hat, s_target)
-    assert torch.all(energy == 0)
-
-
-def test_energy_positive_always(computer):
-    s_hat = torch.randn((2, 256, 512))
-    s_target = torch.randn((2, 256, 512))
-    energy = computer.compute(s_hat, s_target)
-    assert torch.all(energy >= 0)
-
-
-def test_energy_shape_correct(computer):
-    s_hat = torch.randn((2, 256, 512))
-    s_target = torch.randn((2, 256, 512))
-    energy = computer.compute(s_hat, s_target)
-    assert energy.shape == (2, 256)
-
-
-def test_spatial_map_shape(computer):
-    energy = torch.zeros((2, 256))
-    spatial_map = computer.get_spatial_map(energy)
-    assert spatial_map.shape == (2, 16, 16)
-
-
-def test_hazard_below_warn_threshold_is_clear(computer):
-    assert computer.get_hazard_level(0.2) == HazardLevel.CLEAR
-
-
-def test_hazard_above_warn_threshold(computer):
-    assert computer.get_hazard_level(0.5) == HazardLevel.WARN
-
-
-def test_hazard_above_veto_threshold(computer):
-    assert computer.get_hazard_level(0.75) == HazardLevel.CRITICAL
-
-
-def test_should_veto_triggers(computer):
-    assert computer.should_veto(0.70) is True
-
-
-def test_should_not_veto_safe(computer):
-    assert computer.should_veto(0.69) is False
-
-
-def test_no_nan_in_output(computer):
-    s_hat = torch.randn((2, 256, 512))
-    s_target = torch.randn((2, 256, 512))
-    energy = computer.compute(s_hat, s_target)
-    assert not torch.any(torch.isnan(energy))
-
-
-def test_energy_is_normalized(computer):
-    s_hat = torch.rand((2, 256, 512))  # [0, 1]
-    s_target = torch.rand((2, 256, 512))  # [0, 1]
-    energy = computer.compute(s_hat, s_target)
-    assert torch.all(energy >= 0)
-    assert torch.all(energy <= 1.0)  # max squared diff of [0,1] vectors is bounded
-
-
-def test_emergency_brake_threshold(computer):
-    assert computer.should_emergency_brake(0.85) is True
-    assert computer.should_emergency_brake(0.84) is False
+    assert torch.allclose(
+        energy_danger.mean(), torch.tensor(1.0)
+    ), f"Expected 1.0 energy, got {energy_danger.mean()}"
+    assert is_veto_danger is True, "Energy of 1.0 must trigger veto (threshold 0.7)"
