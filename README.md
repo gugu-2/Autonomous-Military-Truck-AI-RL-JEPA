@@ -1,4 +1,4 @@
-# 🧠 OMNIDRIVE
+# 🧠 OMNIDRIVE (Error)
 ## Omni-Purpose Autonomous Driving AI Brain
 
 > **The world's most advanced open-source autonomous driving AI — combining JEPA World Models, Model-Based RL, Vision-Language Reasoning, and Autoware Navigation into a single unified brain.**
